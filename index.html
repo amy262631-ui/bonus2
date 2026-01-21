@@ -1,133 +1,97 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>HR 薪酬工作站 V2 - 虛擬測試版</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <title>HR V2 工作站</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; }
-        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 20px; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; }
-        
-        /* 矩陣按鈕樣式 */
-        .staff-matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .staff-btn { background: white; border: 2px solid #ddd; padding: 15px; border-radius: 10px; cursor: pointer; text-align: center; position: relative; transition: 0.3s; }
-        .staff-btn.active { border-color: var(--accent); background: #e3f2fd; transform: scale(1.05); }
-        .staff-btn .rank-tag { position: absolute; top: 5px; right: 5px; background: #eee; font-size: 10px; padding: 2px 4px; border-radius: 4px; }
-
-        /* 分頁按鈕 */
-        .tab-bar { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { padding: 12px 30px; border-radius: 8px; border: none; cursor: pointer; font-size: 1.1rem; font-weight: bold; background: #ccc; }
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f4f7f6; }
+        body { font-family: "Microsoft JhengHei"; background: var(--bg); padding: 20px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .staff-btn { background: white; border: 2px solid #ddd; padding: 15px; border-radius: 10px; cursor: pointer; text-align: center; }
+        .staff-btn.active { border-color: var(--accent); background: #e3f2fd; font-weight: bold; }
+        .tab-btn { padding: 10px 25px; border: none; cursor: pointer; font-size: 1rem; margin-right: 5px; border-radius: 5px; }
         .tab-btn.active { background: var(--primary); color: white; }
-        .pane { display: none; }
-        .pane.active { display: block; }
-
-        /* 您的 14pt 標準樣式 */
-        .q-score { width: 80px; height: 45px; text-align: center; font-size: 1.2rem; border: 1px solid #ddd; border-radius: 8px; font-weight: bold; }
-        .btn { padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; color: white; font-weight: bold; font-size: 1.1rem; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2 style="margin-top:0;">👤 人員選擇 (全虛擬數據對齊)</h2>
-    <div id="staffMatrix" class="staff-matrix">正在載入人員名單...</div>
+    <h2>👤 人員選擇 (全虛擬資料)</h2>
+    <div id="staffGrid" class="staff-grid">載入中...</div>
 </div>
 
-<div class="tab-bar">
-    <button id="btnB" class="tab-btn active" onclick="switchTab('bonus')">📊 獎金核定</button>
-    <button id="btnS" class="tab-btn" onclick="switchTab('salary')">📈 薪資決策 (🔒)</button>
+<div style="margin-bottom:15px;">
+    <button id="tB" class="tab-btn active" onclick="showTab('B')">📊 獎金核定</button>
+    <button id="tS" class="tab-btn" onclick="showTab('S')">📈 薪資決策(🔒)</button>
 </div>
 
-<div id="paneBonus" class="pane active">
-    <div class="card">
-        <div style="display:flex; gap:20px; align-items:center;">
-            <span>📅 年度：</span>
-            <select id="calcYear" onchange="autoCalc(true)" style="padding:10px; font-size:1.1rem;">
-                <option value="2024">2024</option>
-                <option value="2025" selected>2025</option>
-            </select>
-            <button class="btn" style="background:var(--success);" onclick="handleFinalSave()">💾 儲存</button>
-            <button id="unlockBtn" class="btn" style="background:var(--danger); margin-left:auto;" onclick="askPassword()">🔒 主管授權</button>
-        </div>
-        
-        <div id="annualInputs" class="score-grid" style="margin-top:20px;"></div>
-        <div style="margin-top:15px; font-size:1.3rem; font-weight:bold;">年度平均：<span id="avgSpan">0.00</span></div>
-    </div>
-    
-    <div id="adminZone" style="display:none;" class="card">
-        <h3 style="color:var(--danger);">主管核定區</h3>
-        <div id="resultBody"></div>
-    </div>
+<div id="paneB" class="card">
+    <h3>獎金核定區</h3>
+    <div id="bonusInfo">請先點選人員</div>
 </div>
 
-<div id="paneSalary" class="pane">
-    <div class="card">
-        <h3>📈 薪資歷程與 2026 決議</h3>
-        <div id="salaryLogContainer"></div>
-    </div>
+<div id="paneS" class="card" style="display:none;">
+    <h3>薪資決策歷程</h3>
+    <div id="salaryInfo">需密碼驗證</div>
 </div>
 
 <script>
+    // 💡 務必替換為您最新的 GAS 網址
     const API_URL = "https://script.google.com/macros/s/AKfycbxmNA0AYmcKK5x4iKZz0FwujvvtS4nioZ7fjXLe-oBlaye6qRfIf_WV8gp-Fj9vZPe1OA/exec";
-    let selectedName = "", selectedRank = "", selectedSalary = 0;
+    
+    // 初始化抓取人員
+    window.onload = () => callAPI({action:"getStaff"}, r => renderStaff(r.data));
 
-    window.onload = async () => {
-        try {
-            const res = await fetch(API_URL, {
-                method: "POST",
-                body: JSON.stringify({ action: "getStaff" })
-            });
-            const r = await res.json();
-            if(r.status === "success") renderStaffMatrix(r.data);
-        } catch (e) { console.error("初始化失敗:", e); }
-    };
-
-    function renderStaffMatrix(data) {
-        const m = document.getElementById('staffMatrix');
-        m.innerHTML = data.map(s => `
-            <div class="staff-btn" onclick="selectStaff('${s[0]}', '${s[2]}')">
-                <span class="rank-tag">${s[2]}</span>
-                <span style="font-size:1.2rem; font-weight:bold;">${s[0]}</span>
-                <div style="font-size:0.8rem; color:#666;">${new Date(s[1]).getFullYear()}入職</div>
+    function renderStaff(data) {
+        document.getElementById('staffGrid').innerHTML = data.map(s => `
+            <div class="staff-btn" onclick="selectStaff(this, '${s[0]}')">
+                <div style="font-size:1.2rem;">${s[0]}</div>
+                <div style="font-size:0.8rem; color:gray;">${s[2]} | ${new Date(s[1]).getFullYear()}入職</div>
             </div>
         `).join('');
     }
 
-    async function selectStaff(name, rank) {
-        selectedName = name;
-        document.querySelectorAll('.staff-btn').forEach(b => b.classList.toggle('active', b.innerText.includes(name)));
-        
-        // 抓取薪資
-        const res = await fetch(API_URL, {
-            method: "POST",
-            body: JSON.stringify({ action: "getEffectiveSalary", name: name, date: "2025-01-01" })
+    async function selectStaff(el, name) {
+        document.querySelectorAll('.staff-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        callAPI({action:"getSalary", name:name, date:"2025-01-01"}, r => {
+            document.getElementById('bonusInfo').innerHTML = `<h4>${name}</h4>當前職等: ${r.rank}<br>基準薪資: ${r.salary}`;
         });
-        const r = await res.json();
-        selectedSalary = r.salary;
-        selectedRank = r.rank;
-        
-        // 執行原有計算
-        autoCalc(true);
     }
 
-    async function switchTab(tab) {
-        if(tab === 'salary') {
-            const pwd = prompt("請輸入最高權限密碼：");
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "verifyLevel", pwd: pwd }) });
-            const r = await res.json();
-            if(r.status === "success") {
-                document.getElementById('paneBonus').classList.remove('active');
-                document.getElementById('paneSalary').classList.add('active');
-            } else alert("密碼錯誤");
+    async function showTab(t) {
+        if(t === 'S') {
+            const pwd = prompt("請輸入最高權限密碼(0000)：");
+            callAPI({action:"verify", pwd:pwd}, r => {
+                if(r.status === "success") {
+                    document.getElementById('paneB').style.display = 'none';
+                    document.getElementById('paneS').style.display = 'block';
+                    document.getElementById('tB').classList.remove('active');
+                    document.getElementById('tS').classList.add('active');
+                } else alert("密碼錯誤");
+            });
         } else {
-            document.getElementById('paneSalary').classList.remove('active');
-            document.getElementById('paneBonus').classList.add('active');
+            document.getElementById('paneS').style.display = 'none';
+            document.getElementById('paneB').style.display = 'block';
+            document.getElementById('tS').classList.remove('active');
+            document.getElementById('tB').classList.add('active');
         }
     }
 
-    // --- 此處請貼回您原本剩餘的計算函數 (autoCalc, runLiveCalc 等) ---
+    // 💡 徹底修復 CORS 的核心 Fetch 寫法
+    function callAPI(payload, callback) {
+        fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(json => callback(json))
+        .catch(err => {
+            console.error("API 錯誤:", err);
+            alert("連線失敗，請檢查 GAS 部署是否設為「所有人」並更新網址。");
+        });
+    }
 </script>
 </body>
 </html>
