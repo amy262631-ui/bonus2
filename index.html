@@ -71,41 +71,41 @@
         try {
             const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getStaffList" }) });
             const r = await res.json();
-            const sel = document.getElementById('selEmp');
-            // 💡 確保 data-rank 有被正確寫入 option
-            sel.innerHTML = r.data.map(e => `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`).join('');
             
-            // 初始執行一次
-            initUI();
-        } catch (e) { console.error("初始化名單失敗:", e); }
+            if (r.status === "success" && r.data) {
+                const sel = document.getElementById('selEmp');
+                sel.innerHTML = r.data.map(e => `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`).join('');
+                initUI();
+            } else {
+                console.error("後端回傳失敗:", r.msg);
+            }
+        } catch (e) {
+            console.error("初始化名單失敗:", e);
+        }
     };
 
-    // --- 1. 職等判定與格子生成 (解決全部都是 Q1-Q4 的問題) ---
-   function initUI() {
-    const sel = document.getElementById('selEmp');
-    const opt = sel.options[sel.selectedIndex];
-    if (!opt) return;
+    function initUI() {
+        const sel = document.getElementById('selEmp');
+        if (sel.selectedIndex === -1) return;
+        const opt = sel.options[sel.selectedIndex];
+        
+        // 修正讀取方式，確保抓到字串
+        const rank = (opt.getAttribute('data-rank') || "").toString().trim().toUpperCase();
+        const isL1 = (rank === 'L1');
 
-    // 取得職等字串並轉為大寫，避免空格或大小寫影響
-    let rank = opt.getAttribute('data-rank').toString().toUpperCase().trim();
-    let isL1 = (rank === 'L1');
+        console.log("當前選擇：", opt.value, " 職等實測：", rank);
 
-    console.log("選擇人員：", opt.value, " 抓到的職等：", rank, " 是否為L1：", isL1);
-
-    // 生成輸入格
-    let h = '';
-    const count = isL1 ? 12 : 4;
-    for (let i = 1; i <= count; i++) {
-        h += `<div class="input-group">
-                <span class="input-label">${isL1 ? i + '月' : 'Q' + i}</span>
-                <input type="number" class="q-score ann-in" value="80" oninput="runLiveCalc()">
-              </div>`;
+        let h = '';
+        const count = isL1 ? 12 : 4;
+        for (let i = 1; i <= count; i++) {
+            h += `<div class="input-group">
+                    <span class="input-label">${isL1 ? i + '月' : 'Q' + i}</span>
+                    <input type="number" class="q-score ann-in" value="80" oninput="runLiveCalc()">
+                  </div>`;
+        }
+        document.getElementById('annualInputs').innerHTML = h;
+        autoCalc(true);
     }
-    document.getElementById('annualInputs').innerHTML = h;
-    
-    // 立即同步年度分數
-    autoCalc(true);
-}
 
     // --- 2. 同步後端歷史分數 (解決分數都是 80 且沒變化的問題) ---
     async function autoCalc(forceSync = false) {
