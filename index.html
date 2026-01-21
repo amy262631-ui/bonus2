@@ -85,27 +85,30 @@
     };
 
     function initUI() {
-        const sel = document.getElementById('selEmp');
-        if (sel.selectedIndex === -1) return;
-        const opt = sel.options[sel.selectedIndex];
-        
-        // 修正讀取方式，確保抓到字串
-        const rank = (opt.getAttribute('data-rank') || "").toString().trim().toUpperCase();
-        const isL1 = (rank === 'L1');
+    const sel = document.getElementById('selEmp');
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
 
-        console.log("當前選擇：", opt.value, " 職等實測：", rank);
+    // 💡 修正讀取方式，確保抓到的是 L1 而非 26400
+    const rank = opt.getAttribute('data-rank').toString().toUpperCase().trim();
+    const isL1 = (rank === 'L1');
 
-        let h = '';
-        const count = isL1 ? 12 : 4;
-        for (let i = 1; i <= count; i++) {
-            h += `<div class="input-group">
-                    <span class="input-label">${isL1 ? i + '月' : 'Q' + i}</span>
-                    <input type="number" class="q-score ann-in" value="80" oninput="runLiveCalc()">
-                  </div>`;
-        }
-        document.getElementById('annualInputs').innerHTML = h;
-        autoCalc(true);
+    console.log("選擇人員：", opt.value, " 抓到的職等：", rank);
+
+    let h = '';
+    const count = isL1 ? 12 : 4;
+    for (let i = 1; i <= count; i++) {
+        // 💡 移除預設值 value="80"，改為空值或等待同步
+        h += `<div class="input-group">
+                <span class="input-label">${isL1 ? i + '月' : 'Q' + i}</span>
+                <input type="number" class="q-score ann-in" oninput="runLiveCalc()">
+              </div>`;
     }
+    document.getElementById('annualInputs').innerHTML = h;
+    
+    // 💡 關鍵：生成格子後立即向後端要歷史分數
+    autoCalc(true); 
+}
 
     // --- 2. 同步後端歷史分數 (解決分數都是 80 且沒變化的問題) ---
     async function autoCalc(forceSync = false) {
