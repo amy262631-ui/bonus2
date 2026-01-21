@@ -81,9 +81,9 @@
 <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
     let chartObj = null;
-    let timelineData = {}; // 存放職等與薪資快照
+    let timelineData = {}; 
+    let baseResults = {}; // 存放後端回傳的年度參數 (System_Config)
 
-    // 1. 初始化名單 (解決 CORS 寫法)
     window.onload = () => {
         fetch(API_URL, {
             method: "POST",
@@ -93,12 +93,11 @@
         .then(r => {
             const sel = document.getElementById('selEmp');
             sel.innerHTML = r.data.map(e => `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`).join('');
-            initUI(); // 名單載入後立即初始化 UI
+            initUI(); 
         })
         .catch(err => console.error("連線錯誤:", err));
     };
 
-    // 2. 初始化介面邏輯 (修復 initUI)
     function initUI() {
         const sel = document.getElementById('selEmp');
         if (!sel.options[sel.selectedIndex]) return;
@@ -108,29 +107,46 @@
         const salary = opt.dataset.salary; 
         const isL1 = (rank === 'L1');
 
-        // 設定職等薪資快照
         timelineData = { 
             Q1:{r:rank, s:salary}, Q2:{r:rank, s:salary}, 
             Q3:{r:rank, s:salary}, Q4:{r:rank, s:salary} 
         };
 
-        // 動態生成輸入框
         let html = '';
         const count = isL1 ? 12 : 4;
-        const labelText = isL1 ? '月' : 'Q';
-        
         for (let i = 1; i <= count; i++) {
             html += `<div class="input-group">
-                        <span class="input-label">${isL1 ? i : ''}${labelText}${!isL1 ? i : ''}</span>
+                        <span class="input-label">${isL1 ? i+'月' : 'Q'+i}</span>
                         <input type="number" class="q-score ann-in" value="80" oninput="runLiveCalc()">
                      </div>`;
         }
-        
         document.getElementById('inputSection').innerHTML = html;
-        runLiveCalc(); // 初始化後跑一次計算與繪圖
+        
+        // 💡 修正點：初始化後自動跑一次 autoCalc
+        autoCalc(true); 
     }
 
-    // 3. 即時計算與圖表更新
+    // --- 核心邏輯：自動計算與後端參數同步 ---
+    async function autoCalc(forceSync = false) {
+        const name = document.getElementById('selEmp').value;
+        const year = document.getElementById('calcYear').value;
+        
+        // 抓取年度配置參數 (從 System_Config)
+        try {
+            const res = await fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify({ action: "getConfigs", year: year })
+            });
+            const r = await res.json();
+            if(r.status === "success") {
+                baseResults.yearConfigs = r.yearConfigs;
+                runLiveCalc(); // 參數到位後，執行計算
+            }
+        } catch (e) {
+            console.error("抓取配置失敗", e);
+        }
+    }
+
     function runLiveCalc() {
         const inputs = document.querySelectorAll('.ann-in');
         let total = 0;
@@ -146,16 +162,13 @@
         
         updateMainChart(vals); 
         
-        // 如果有 adminZone 的連動函數請放在這
+        // 如果您有主管核定區，這裡會觸發表格刷新
         if (typeof updateAdminTableUI === "function") updateAdminTableUI();
     }
 
-    // 4. 更新圖表
     function updateMainChart(data) {
         const ctx = document.getElementById('mainChart').getContext('2d');
-        const isL1 = data.length === 12;
-        const labels = isL1 ? ["1","2","3","4","5","6","7","8","9","10","11","12"] : ["Q1","Q2","Q3","Q4"];
-
+        const labels = data.length === 12 ? ["1","2","3","4","5","6","7","8","9","10","11","12"] : ["Q1","Q2","Q3","Q4"];
         if (chartObj) chartObj.destroy();
         chartObj = new Chart(ctx, {
             type: 'line',
@@ -165,38 +178,28 @@
                     label: '評分趨勢',
                     data: data,
                     borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
                     fill: true,
                     tension: 0.3
                 }]
             },
-            options: {
-                maintainAspectRatio: false,
-                plugins: { datalabels: { display: true, align: 'top' } },
-                scales: { y: { min: 0, max: 100 } }
-            }
+            options: { maintainAspectRatio: false }
         });
     }
 
-    // 5. 切換分頁
+    // --- 薪資管理分頁功能 (維持不變) ---
     function switchPage(tab) {
         if(tab === 'S') {
-            const pwd = prompt("進入薪資管理需要最高權限，請輸入密碼：");
+            const pwd = prompt("請輸入密碼：");
             if(pwd !== "0000") return alert("無權限！");
             document.getElementById('pageB').style.display = 'none';
             document.getElementById('pageS').style.display = 'block';
-            document.getElementById('tabB').classList.remove('active');
-            document.getElementById('tabS').classList.add('active');
             loadSalaryHistory();
         } else {
             document.getElementById('pageS').style.display = 'none';
             document.getElementById('pageB').style.display = 'block';
-            document.getElementById('tabS').classList.remove('active');
-            document.getElementById('tabB').classList.add('active');
         }
     }
 
-    // 6. 抓取薪資歷史
     async function loadSalaryHistory() {
         const name = document.getElementById('selEmp').value;
         const res = await fetch(API_URL, {
@@ -205,36 +208,12 @@
         });
         const r = await res.json();
         let html = `<table class="history-table"><thead><tr><th>生效日期</th><th>月薪</th><th>職等</th><th>備註</th></tr></thead><tbody>`;
-        if(r.history && r.history.length > 0) {
-            r.history.forEach(h => {
-                html += `<tr><td>${new Date(h[1]).toLocaleDateString()}</td><td>$${h[2].toLocaleString()}</td><td>${h[3]}</td><td>${h[5]}</td></tr>`;
-            });
-        } else {
-            html += `<tr><td colspan="4">尚無歷史紀錄</td></tr>`;
-        }
+        r.history.forEach(h => {
+            html += `<tr><td>${new Date(h[1]).toLocaleDateString()}</td><td>$${h[2].toLocaleString()}</td><td>${h[3]}</td><td>${h[5]}</td></tr>`;
+        });
         html += `</tbody></table>`;
         document.getElementById('salaryHistoryContainer').innerHTML = html;
     }
-
-    // 7. 儲存薪資決策
-    async function doSaveSalary() {
-        const data = {
-            action: "saveSalaryLog",
-            empName: document.getElementById('selEmp').value,
-            date: document.getElementById('newSDate').value,
-            amount: document.getElementById('newSAmt').value,
-            level: document.getElementById('newSRank').value,
-            note: "2026 年度調薪決議"
-        };
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
-        const r = await res.json();
-        if(r.status === "success") {
-            alert("薪資決議已存檔！");
-            loadSalaryHistory();
-        }
-    }
-
-    // --- 若有 autoCalc 或 handleFinalSave 請接續在下方 ---
 </script>
 </body>
 </html>
