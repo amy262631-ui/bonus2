@@ -140,20 +140,57 @@
         }
     }
 
-    function updateAdminTableUI(adjs) {
-        const ad = adjs || [0,0,0,0,80000,0];
-        document.getElementById('resultBody').innerHTML = `<tr>
-            <td>${document.getElementById('selEmp').value}</td>
-            <td>${document.getElementById('calcYear').value}</td>
-            <td><input type="number" class="target-input" id="t_f1" value="${baseResults.f1 + ad[0]}" oninput="refreshTotal()"></td>
-            <td><input type="number" class="target-input" id="t_f2" value="${baseResults.f2 + ad[1]}" oninput="refreshTotal()"></td>
-            <td><input type="number" class="target-input" id="t_f3" value="${baseResults.f3 + ad[2]}" oninput="refreshTotal()"></td>
-            <td><input type="number" class="target-input" id="t_ye" value="${baseResults.ye + ad[3]}" oninput="refreshTotal()"></td>
-            <td><input type="number" class="target-input" id="t_pj" value="${ad[4] + ad[5]}" oninput="refreshTotal()"></td>
-            <td id="totalCell" style="font-weight:bold; color:red; font-size:1.8rem;">0</td>
-        </tr>`;
-        refreshTotal();
-    }
+   // --- 修正後的函數：確保手動修改過的金額不會被系統試算值覆蓋 ---
+function updateAdminTableUI(adjs) {
+    // adjs 來自後端 Bonus_Records，順序為 [f1_adj, f2_adj, f3_adj, ye_adj, proj_final_base, proj_adj]
+    // 💡 第一代邏輯：實際金額 = 試算參考值 + 調整額(adj)
+    const ad = adjs || [0, 0, 0, 0, 80000, 0];
+    
+    // 取得當前畫面的試算參考值
+    const refF1 = baseResults.f1 || 0;
+    const refF2 = baseResults.f2 || 0;
+    const refF3 = baseResults.f3 || 0;
+    const refYe = baseResults.ye || 0;
+    
+    // 💡 專案獎金特殊處理：原本就是手動輸入為主
+    const projBase = ad[4]; // 這是存檔時的專案基數
+    const projAdj = ad[5];  // 這是存檔時的加減項
+
+    const html = `<tr>
+        <td>${document.getElementById('selEmp').value}</td>
+        <td>${document.getElementById('calcYear').value}</td>
+        
+        <td>
+            <span class="reference-text">試算:${refF1.toLocaleString()}</span>
+            <input type="number" class="target-input" id="t_f1" value="${refF1 + ad[0]}" oninput="refreshTotal()">
+        </td>
+        
+        <td>
+            <span class="reference-text">試算:${refF2.toLocaleString()}</span>
+            <input type="number" class="target-input" id="t_f2" value="${refF2 + ad[1]}" oninput="refreshTotal()">
+        </td>
+        
+        <td>
+            <span class="reference-text">試算:${refF3.toLocaleString()}</span>
+            <input type="number" class="target-input" id="t_f3" value="${refF3 + ad[2]}" oninput="refreshTotal()">
+        </td>
+        
+        <td>
+            <span class="reference-text">試算:${refYe.toLocaleString()}</span>
+            <input type="number" class="target-input" id="t_ye" value="${refYe + ad[3]}" oninput="refreshTotal()">
+        </td>
+        
+        <td>
+            <span class="reference-text">基數:${projBase.toLocaleString()}</span>
+            <input type="number" class="target-input" id="t_pj" value="${projBase + projAdj}" oninput="refreshTotal()">
+        </td>
+        
+        <td id="totalCell" style="font-weight:bold; color:red; font-size:1.8rem;">0</td>
+    </tr>`;
+    
+    document.getElementById('resultBody').innerHTML = html;
+    refreshTotal();
+}
 
     function refreshTotal() {
         let t = 0; ['t_f1','t_f2','t_f3','t_ye','t_pj'].forEach(id => t += parseFloat(document.getElementById(id).value || 0));
