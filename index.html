@@ -68,16 +68,121 @@
     Chart.register(ChartDataLabels);
 
     window.onload = async () => {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getStaffList" }) });
-        const r = await res.json();
-        document.getElementById('selEmp').innerHTML = r.data.map(e => `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`).join('');
-        initUI();
+        try {
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getStaffList" }) });
+            const r = await res.json();
+            const sel = document.getElementById('selEmp');
+            // 💡 確保 data-rank 有被正確寫入 option
+            sel.innerHTML = r.data.map(e => `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`).join('');
+            
+            // 初始執行一次
+            initUI();
+        } catch (e) { console.error("初始化名單失敗:", e); }
     };
 
-    // --- 安全驗證：向後端請求確認密碼 ---
+    // --- 1. 職等判定與格子生成 (解決全部都是 Q1-Q4 的問題) ---
+    function initUI() {
+        const sel = document.getElementById('selEmp');
+        if (sel.selectedIndex === -1) return;
+        
+        const opt = sel.options[sel.selectedIndex];
+        const rank = opt.getAttribute('data-rank'); // 強制讀取職等
+        const isL1 = (rank === 'L1');
+
+        console.log("當前選擇：", opt.value, "職等：", rank); // 除錯用
+
+        // 生成輸入格
+        let h = '';
+        const count = isL1 ? 12 : 4;
+        for (let i = 1; i <= count; i++) {
+            h += `<div class="input-group">
+                    <span class="input-label" style="font-size:1rem; font-weight:bold; color:#555;">${isL1 ? i + '月' : 'Q' + i}</span>
+                    <input type="number" class="q-score ann-in" value="80" oninput="runLiveCalc()">
+                  </div>`;
+        }
+        document.getElementById('annualInputs').innerHTML = h;
+        
+        // 2. 切換人員後，立即同步該員在該年度的歷史分數與參數
+        autoCalc(true);
+    }
+
+    // --- 2. 同步後端歷史分數 (解決分數都是 80 且沒變化的問題) ---
+    async function autoCalc(forceSync = false) {
+        const name = document.getElementById('selEmp').value;
+        const year = document.getElementById('calcYear').value;
+        
+        try {
+            const res = await fetch(API_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ action: "getConfigs", year: year, empName: name }) 
+            });
+            const r = await res.json();
+            
+            if (r.status === "success") {
+                baseResults = r.yearConfigs;
+
+                // 如果後端有回傳歷史分數紀錄
+                if (forceSync && r.historyScores && r.historyScores.length > 0) {
+                    const inputs = document.querySelectorAll('.ann-in');
+                    inputs.forEach((el, i) => {
+                        if (r.historyScores[i] !== undefined) el.value = r.historyScores[i];
+                    });
+                } else if (forceSync) {
+                    // 若無紀錄，清空或設為預設
+                    document.querySelectorAll('.ann-in').forEach(el => el.value = 80);
+                }
+                
+                runLiveCalc(); // 重新計算平均分與畫圖
+            }
+        } catch (e) { console.error("同步後端失敗:", e); }
+    }
+
+    function runLiveCalc() {
+        const inputs = Array.from(document.querySelectorAll('.ann-in'));
+        const vals = inputs.map(i => parseFloat(i.value || 0));
+        
+        // 計算平均
+        const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+        document.getElementById('avgSpan').innerText = avg;
+        
+        // 更新趨勢圖
+        updateChart(vals);
+    }
+
+    function updateChart(data) {
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        const isL1 = (data.length === 12);
+        const labels = isL1 ? ["1","2","3","4","5","6","7","8","9","10","11","12"] : ["Q1","Q2","Q3","Q4"];
+
+        if (chartObj) chartObj.destroy();
+        chartObj = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '評分趨勢',
+                    data: data,
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                plugins: {
+                    datalabels: { display: true, align: 'top', font: { weight: 'bold' } }
+                },
+                scales: { y: { min: 0, max: 100 } }
+            }
+        });
+    }
+
+    // --- 安全驗證與分頁切換 (與上一版相同) ---
     async function verifyIdentity(targetId) {
         const pwd = prompt("請輸入授權密碼：");
-        if (!pwd) return;
+        if (!pwd) return false;
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "verifyAdmin", password: pwd }) });
         const r = await res.json();
         if (r.status === "success") {
@@ -90,9 +195,9 @@
     }
 
     async function switchPage(tab) {
-        if(tab === 'S') {
+        if (tab === 'S') {
             const isAuth = await verifyIdentity();
-            if(!isAuth) return;
+            if (!isAuth) return;
             document.getElementById('pageB').style.display = 'none';
             document.getElementById('pageS').style.display = 'block';
             document.getElementById('tabB').classList.remove('active');
@@ -106,50 +211,11 @@
         }
     }
 
-    function initUI() {
-        const opt = document.getElementById('selEmp').selectedOptions[0];
-        const rank = opt.dataset.rank, isL1 = (rank === 'L1');
-        let h = '';
-        for(let i=1; i<=(isL1?12:4); i++) h += `<div class="input-group"><span>${isL1?i+'月':'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
-        document.getElementById('annualInputs').innerHTML = h;
-        autoCalc(true);
-    }
-
-    async function autoCalc(sync) {
-        const name = document.getElementById('selEmp').value, year = document.getElementById('calcYear').value;
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getConfigs", year: year, empName: name }) });
-        const r = await res.json();
-        if(r.status === "success") {
-            baseResults = r.yearConfigs;
-            if(sync) {
-                document.querySelectorAll('.ann-in').forEach((el, i) => el.value = (r.historyScores && r.historyScores[i]) ? r.historyScores[i] : 80);
-            }
-            runLiveCalc();
-        }
-    }
-
-    function runLiveCalc() {
-        const vals = Array.from(document.querySelectorAll('.ann-in')).map(i => parseFloat(i.value || 0));
-        document.getElementById('avgSpan').innerText = (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2);
-        updateChart(vals);
-    }
-
-    function updateChart(data) {
-        const ctx = document.getElementById('scoreChart').getContext('2d');
-        if (chartObj) chartObj.destroy();
-        chartObj = new Chart(ctx, {
-            type: 'line',
-            data: { labels: data.length==12?["1","2","3","4","5","6","7","8","9","10","11","12"]:["Q1","Q2","Q3","Q4"], datasets: [{ label: '績效趨勢', data: data, borderColor: '#3498db', tension: 0.3 }] },
-            options: { maintainAspectRatio: false, plugins: { datalabels: { display: true, align: 'top' } } }
-        });
-    }
-
     async function loadSalaryHistory() {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", name: document.getElementById('selEmp').value }) });
         const r = await res.json();
         let h = `<table class="history-table"><thead><tr><th>日期</th><th>薪資</th><th>備註</th></tr></thead><tbody>`;
         r.history.forEach(i => {
-            // 💡 修正日期報錯：只取 YYYY-MM-DD
             const dateStr = i[1].toString().split('T')[0];
             h += `<tr><td>${dateStr}</td><td>$${i[2].toLocaleString()}</td><td>${i[5]}</td></tr>`;
         });
