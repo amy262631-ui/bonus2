@@ -44,14 +44,16 @@
     window.onload = () => callAPI({action:"getStaff"}, r => renderStaff(r.data));
 
     function renderStaff(data) {
+        const grid = document.getElementById('staffGrid');
         if (!data || data.length === 0) {
-            document.getElementById('staffGrid').innerHTML = "目前名單中沒有資料，請檢查 Staff_Master 分頁。";
+            grid.innerHTML = "目前名單中沒有資料，請檢查 Salary_Master 分頁。";
             return;
         }
-        document.getElementById('staffGrid').innerHTML = data.map(s => `
+        grid.innerHTML = data.map(s => `
             <div class="staff-btn" onclick="selectStaff(this, '${s[0]}')">
-                <div style="font-size:1.2rem;">${s[0]}</div>
-                <div style="font-size:0.8rem; color:gray;">${s[2]} | ${new Date(s[1]).getFullYear()}入職</div>
+                <span style="position:absolute; top:5px; right:5px; font-size:10px; background:#eee; padding:2px 4px; border-radius:3px;">${s[1]}</span>
+                <div style="font-size:1.2rem; font-weight:bold; margin-top:5px;">${s[0]}</div>
+                <div style="font-size:0.8rem; color:gray;">${new Date(s[3]).getFullYear()}入職</div>
             </div>
         `).join('');
     }
