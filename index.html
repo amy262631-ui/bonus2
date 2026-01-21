@@ -44,6 +44,10 @@
     window.onload = () => callAPI({action:"getStaff"}, r => renderStaff(r.data));
 
     function renderStaff(data) {
+        if (!data || data.length === 0) {
+            document.getElementById('staffGrid').innerHTML = "目前名單中沒有資料，請檢查 Staff_Master 分頁。";
+            return;
+        }
         document.getElementById('staffGrid').innerHTML = data.map(s => `
             <div class="staff-btn" onclick="selectStaff(this, '${s[0]}')">
                 <div style="font-size:1.2rem;">${s[0]}</div>
