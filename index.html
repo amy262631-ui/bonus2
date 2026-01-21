@@ -2,46 +2,25 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>獎金及薪資管理系統 V2 - 完整還原版</title>
+    <title>獎金及薪資管理系統 V2 - 安全加固版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
-    :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --project: #e67e22; --bg: #f4f7f6; }
-    body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 20px; font-size: 14pt; }
-    .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; }
-    
-    .nav-bar { display: flex; gap: 15px; margin-bottom: 25px; }
-    .nav-btn { flex: 1; padding: 18px; font-size: 1.4rem; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; background: #dcdde1; color: #7f8c8d; }
-    .nav-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-
-    .header-controls { display: flex; gap: 20px; align-items: center; margin-bottom: 25px; }
-    #selEmp, #calcYear { padding: 12px 20px; border-radius: 10px; border: 1px solid #ccc; font-size: 1.2rem; }
-    .score-container { display: flex; flex-direction: column; gap: 12px; padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 8px solid var(--primary); margin-bottom: 20px; }
-    .score-grid { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
-    .input-group { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    .q-score { width: 80px; height: 45px; text-align: center; font-size: 1.2rem; border: 1px solid #ddd; border-radius: 8px; font-weight: bold; padding: 0 4px; }
-    .avg-display { min-width: 180px; background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-left: auto; font-size: 1.3rem; font-weight: bold; }
-    .target-input { width: 130px; height: 50px; color: var(--danger); font-size: 1.5rem; border: 2px solid var(--danger); text-align: center; font-weight: bold; background: #fff5f5; border-radius: 8px; }
-    .btn { padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer; color: white; font-weight: bold; display: flex; align-items: center; gap: 8px; font-size: 1.1rem; }
-    .total-cell { font-size: 2.8rem; font-weight: bold; background: #fff3cd; color: #d35400; min-width: 180px; }
-
-    /* 薪資歷史表格 */
-    .history-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    .history-table th, .history-table td { border: 1px solid #ddd; padding: 15px; text-align: center; font-size: 18px; }
-    .history-table th { background: #f4f4f4; }
-
-    /* 報表 Modal */
-    #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; overflow-y: auto; padding: 40px 20px; }
-    .report-content { background: white; max-width: 1100px; margin: 0 auto; padding: 40px; border-radius: 15px; position: relative; }
-    .excel-report { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
-    .excel-report th, .excel-report td { border: 1px solid #000 !important; padding: 12px 8px; font-size: 18px; line-height: 1.4; }
-    
-    @media print {
-        body * { visibility: hidden; }
-        #reportModal, #reportModal * { visibility: visible; }
-        #reportModal { position: absolute; left: 0; top: 0; width: 100%; background: white !important; }
-        .no-print { display: none !important; }
-    }
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 20px; font-size: 14pt; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .nav-bar { display: flex; gap: 15px; margin-bottom: 25px; }
+        .nav-btn { flex: 1; padding: 18px; font-size: 1.4rem; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; background: #dcdde1; color: #7f8c8d; transition: 0.3s; }
+        .nav-btn.active { background: var(--primary); color: white; }
+        .header-controls { display: flex; gap: 20px; align-items: center; margin-bottom: 25px; }
+        .score-container { display: flex; flex-direction: column; gap: 12px; padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 8px solid var(--primary); margin-bottom: 20px; }
+        .score-grid { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .q-score { width: 80px; height: 45px; text-align: center; font-size: 1.2rem; border: 1px solid #ddd; border-radius: 8px; font-weight: bold; }
+        .avg-display { min-width: 180px; background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-left: auto; font-size: 1.3rem; font-weight: bold; }
+        .admin-table { width: 100%; border-collapse: collapse; text-align: center; }
+        .admin-table th, .admin-table td { border: 1px solid #ddd; padding: 12px; }
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .history-table th, .history-table td { border: 1px solid #ddd; padding: 15px; text-align: center; font-size: 18px; }
     </style>
 </head>
 <body>
@@ -54,75 +33,39 @@
 <div id="pageB">
     <div class="card">
         <div class="header-controls">
-            <span style="font-weight: bold;">👤 人員：</span>
+            <span>👤 人員：</span>
             <select id="selEmp" onchange="initUI()"></select>
-            <span style="font-weight: bold;">📅 年度：</span>
+            <span>📅 年度：</span>
             <select id="calcYear" onchange="autoCalc(true)">
                 <option value="2023">2023</option><option value="2024">2024</option>
                 <option value="2025" selected>2025</option><option value="2026">2026</option>
             </select>
-            <button class="btn" style="background:var(--success);" onclick="handleFinalSave()">💾 儲存數據</button>
-            <button id="unlockBtn" class="btn" style="background:var(--danger); margin-left:auto;" onclick="askPassword()">🔒 主管授權</button>
+            <button class="nav-btn" style="background:var(--success); flex:none; padding:10px 20px;" onclick="handleFinalSave()">💾 儲存</button>
+            <button id="unlockBtn" class="nav-btn" style="background:var(--danger); flex:none; padding:10px 20px; margin-left:auto;" onclick="verifyIdentity('adminZone')">🔒 主管授權</button>
         </div>
-
         <div class="score-container">
-            <div style="font-weight:bold; color:var(--primary);">🗓️ 年度績效評分</div>
             <div id="annualInputs" class="score-grid"></div>
-            <div class="avg-display">年度平均：<span id="avgSpan">0.00</span></div>
+            <div class="avg-display">平均分數：<span id="avgSpan">0.00</span></div>
         </div>
-
-        <div class="score-container" style="border-left-color: var(--project); background: #fdf5e6;">
-            <div style="font-weight:bold; color:var(--project);">🚀 專案表現評分</div>
-            <div id="projInputs" class="score-grid"></div>
-            <div class="avg-display" style="background:var(--project);">專案平均：<span id="projAvgSpan">0.00</span></div>
-        </div>
-        
-        <div style="height:400px; margin-top: 20px;"><canvas id="scoreChart"></canvas></div>
+        <div style="height:350px;"><canvas id="scoreChart"></canvas></div>
     </div>
-
-    <div id="adminZone" style="display:none;">
-        <div class="card" style="border: 2px solid var(--danger);">
-            <h2 style="color:var(--danger);">主管獎金核定 (含調整欄位)</h2>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:20px; border:1px solid #ddd;">
-                <tr style="background:#f4f4f4;"><th>項目</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr>
-                <tr id="tmRankRow"></tr><tr id="tmSalaryRow"></tr>
-            </table>
-            <table style="width:100%; text-align:center; border-collapse:collapse;">
-                <thead><tr style="background:#f4f4f4;"><th>姓名</th><th>年度</th><th>平均分</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計額</th></tr></thead>
-                <tbody id="resultBody"></tbody>
-            </table>
-            <div style="display:flex; justify-content:center; gap:15px; margin-top:30px;">
-                <button class="btn" style="background:var(--success);" onclick="handleFinalSave()">💾 確認並儲存</button>
-                <button class="btn" style="background:var(--accent);" onclick="openReport('single')">📄 個人報表</button>
-                <button class="btn" style="background:var(--primary);" onclick="openReport('all')">🌐 全體總表</button>
-            </div>
-        </div>
-        <div class="card">
-            <h2>📈 歷年獎金對比 <div style="height:350px;"><canvas id="historyCompareChart"></canvas></div></h2>
-            <h2>📈 總獎金趨勢 <div style="height:350px;"><canvas id="historyTrendChart"></canvas></div></h2>
-        </div>
+    <div id="adminZone" style="display:none;" class="card">
+        <h2 style="color:var(--danger);">主管獎金核定區</h2>
+        <table class="admin-table"><tbody id="adminBody"></tbody></table>
     </div>
 </div>
 
 <div id="pageS" style="display:none;">
     <div class="card">
-        <h2 style="color:var(--accent);">薪資歷史成長紀錄 (Salary_Log)</h2>
+        <h2>薪資歷史紀錄 (Salary_Log)</h2>
         <div id="salaryHistoryContainer"></div>
-        <div class="card" style="background:#eef7ff; border:2px solid var(--accent); margin-top:30px;">
-            <h3>🖋️ 2026 薪資調整決議</h3>
-            <input type="date" id="newSDate" class="q-score" style="width:180px;">
-            <input type="number" id="newSAmt" placeholder="月薪" class="q-score" style="width:140px;">
-            <button class="btn" style="background:var(--accent); width:100%; margin-top:15px;" onclick="doSaveSalary()">💾 儲存薪資決議</button>
-        </div>
     </div>
 </div>
 
-<div id="reportModal"><div class="report-content" id="reportInner"></div></div>
-
 <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
-    let scoreChart=null, historyCompareChart=null, historyTrendChartInstance=null, timelineData={}, baseResults={};
-    let isUserTyping = false; Chart.register(ChartDataLabels);
+    let chartObj = null, timelineData = {}, baseResults = {};
+    Chart.register(ChartDataLabels);
 
     window.onload = async () => {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getStaffList" }) });
@@ -131,119 +74,86 @@
         initUI();
     };
 
-    function switchPage(tab) {
+    // --- 安全驗證：向後端請求確認密碼 ---
+    async function verifyIdentity(targetId) {
+        const pwd = prompt("請輸入授權密碼：");
+        if (!pwd) return;
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "verifyAdmin", password: pwd }) });
+        const r = await res.json();
+        if (r.status === "success") {
+            if(targetId) document.getElementById(targetId).style.display = 'block';
+            return true;
+        } else {
+            alert(r.msg);
+            return false;
+        }
+    }
+
+    async function switchPage(tab) {
         if(tab === 'S') {
-            const p = prompt("密碼："); if(p !== "0000") return;
-            document.getElementById('pageB').style.display = 'none'; document.getElementById('pageS').style.display = 'block';
-            document.getElementById('tabB').classList.remove('active'); document.getElementById('tabS').classList.add('active');
+            const isAuth = await verifyIdentity();
+            if(!isAuth) return;
+            document.getElementById('pageB').style.display = 'none';
+            document.getElementById('pageS').style.display = 'block';
+            document.getElementById('tabB').classList.remove('active');
+            document.getElementById('tabS').classList.add('active');
             loadSalaryHistory();
         } else {
-            document.getElementById('pageS').style.display = 'none'; document.getElementById('pageB').style.display = 'block';
-            document.getElementById('tabS').classList.remove('active'); document.getElementById('tabB').classList.add('active');
+            document.getElementById('pageS').style.display = 'none';
+            document.getElementById('pageB').style.display = 'block';
+            document.getElementById('tabS').classList.remove('active');
+            document.getElementById('tabB').classList.add('active');
         }
     }
 
     function initUI() {
-        const sel = document.getElementById('selEmp'); const opt = sel.options[sel.selectedIndex];
-        const isL1 = opt.dataset.rank === 'L1';
-        timelineData = { Q1:{r:opt.dataset.rank, s:opt.dataset.salary}, Q2:{r:opt.dataset.rank, s:opt.dataset.salary}, Q3:{r:opt.dataset.rank, s:opt.dataset.salary}, Q4:{r:opt.dataset.rank, s:opt.dataset.salary} };
-        let h1 = '', h2 = '';
-        for(let i=1; i<=(isL1?12:4); i++) h1 += `<div class="input-group"><span class="input-label">${isL1?i+'月':'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
-        for(let i=1; i<=12; i++) h2 += `<div class="input-group"><span class="input-label">${i}月</span><input type="number" class="q-score prj-in" oninput="runLiveCalc()"></div>`;
-        document.getElementById('annualInputs').innerHTML = h1; document.getElementById('projInputs').innerHTML = h2;
-        autoCalc(true); 
+        const opt = document.getElementById('selEmp').selectedOptions[0];
+        const rank = opt.dataset.rank, isL1 = (rank === 'L1');
+        let h = '';
+        for(let i=1; i<=(isL1?12:4); i++) h += `<div class="input-group"><span>${isL1?i+'月':'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
+        document.getElementById('annualInputs').innerHTML = h;
+        autoCalc(true);
     }
 
-    async function autoCalc(forceSync = false) {
-        if (isUserTyping && !forceSync) return;
+    async function autoCalc(sync) {
         const name = document.getElementById('selEmp').value, year = document.getElementById('calcYear').value;
-        try {
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getConfigs", year: year, empName: name }) });
-            const r = await res.json();
-            if(r.status === "success") {
-                baseResults.yearConfigs = r.yearConfigs;
-                if(forceSync) {
-                    if(r.historyScores) document.querySelectorAll('.ann-in').forEach((el,i) => el.value = r.historyScores[i] || 80);
-                    if(r.historyProjScores) document.querySelectorAll('.prj-in').forEach((el,i) => el.value = r.historyProjScores[i] || 80);
-                    runLiveCalc(); 
-                }
-                renderTimelineUI(); updateAdminTableUI(r.historyAdjs || [0,0,0,0,80000,0]); updateHistoryCharts();
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getConfigs", year: year, empName: name }) });
+        const r = await res.json();
+        if(r.status === "success") {
+            baseResults = r.yearConfigs;
+            if(sync) {
+                document.querySelectorAll('.ann-in').forEach((el, i) => el.value = (r.historyScores && r.historyScores[i]) ? r.historyScores[i] : 80);
             }
-        } catch(e) { console.error(e); }
+            runLiveCalc();
+        }
     }
 
     function runLiveCalc() {
-        const getAvg = (cls) => {
-            const v = Array.from(document.querySelectorAll(cls)).map(i => parseFloat(i.value)).filter(v => !isNaN(v));
-            return v.length > 0 ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(2) : "0.00";
-        };
-        document.getElementById('avgSpan').innerText = getAvg('.ann-in');
-        document.getElementById('projAvgSpan').innerText = getAvg('.prj-in');
-        updateScoreChart(); updateAdminTableUI();
+        const vals = Array.from(document.querySelectorAll('.ann-in')).map(i => parseFloat(i.value || 0));
+        document.getElementById('avgSpan').innerText = (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2);
+        updateChart(vals);
     }
 
-    function updateScoreChart() {
-        const ctx = document.getElementById('scoreChart').getContext('2d'); if (scoreChart) scoreChart.destroy();
-        const annVals = Array.from(document.querySelectorAll('.ann-in')).map(i => parseFloat(i.value));
-        const prjVals = Array.from(document.querySelectorAll('.prj-in')).map(i => parseFloat(i.value));
-        const annData = annVals.length === 4 ? [{x:3, y:annVals[0]}, {x:6, y:annVals[1]}, {x:9, y:annVals[2]}, {x:12, y:annVals[3]}] : annVals.map((v, i) => ({x: i+1, y: v}));
-        scoreChart = new Chart(ctx, { type: 'line', data: { datasets: [{ label: '年度評分', data: annData, borderColor: '#3498db', tension: 0.1, pointRadius: 5 }, { label: '專案評分', data: prjVals.map((v, i) => ({x: i+1, y: v})), borderColor: '#e67e22', borderDash: [5,5] } ]}, options: { maintainAspectRatio: false, scales: { x: { type: 'linear', min:1, max:12 } }, plugins: { datalabels: { display: true, align:'top', formatter: v => v.y || '' } } } });
-    }
-
-    // --- 完整還原主管核定區公式 ---
-    function updateAdminTableUI(adjs = null) {
-        const cfg = baseResults.yearConfigs || {}; const rb = document.getElementById('resultBody'); if (!rb) return;
-        const calcRef = (q, idx) => {
-            const r = timelineData[q].r, s = parseFloat(timelineData[q].s);
-            if (r === "L1") return parseFloat(cfg.L1_Fest_Over_6M || 1000);
-            const base = parseFloat(cfg[`${r}_Base`] || 1.0), qScore = parseFloat(document.querySelectorAll('.ann-in')[idx]?.value || 0);
-            return Math.round(s * 0.25 * base * (qScore >= 80 ? 1.0 : 0.8));
-        };
-        let html = `<tr><td>${document.getElementById('selEmp').value}</td><td>${document.getElementById('calcYear').value}</td><td style="color:blue;">${document.getElementById('avgSpan').innerText}</td>`;
-        ['f1', 'f2', 'f3', 'ye', 'proj'].forEach((item, i) => {
-            let ref = (i < 3) ? calcRef("Q"+(i+1), i) : 20000; // 簡化示範公式
-            html += `<td><span class="reference-text">參考:${ref.toLocaleString()}</span><input type="number" class="target-input" id="target_${item}" value="${ref + (adjs?adjs[i]:0)}" oninput="refreshTotal()"></td>`;
+    function updateChart(data) {
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        if (chartObj) chartObj.destroy();
+        chartObj = new Chart(ctx, {
+            type: 'line',
+            data: { labels: data.length==12?["1","2","3","4","5","6","7","8","9","10","11","12"]:["Q1","Q2","Q3","Q4"], datasets: [{ label: '績效趨勢', data: data, borderColor: '#3498db', tension: 0.3 }] },
+            options: { maintainAspectRatio: false, plugins: { datalabels: { display: true, align: 'top' } } }
         });
-        html += `<td id="totalCell" class="total-cell">0</td></tr>`;
-        rb.innerHTML = html; refreshTotal();
     }
-
-    function refreshTotal() {
-        let t = 0; ['target_f1','target_f2','target_f3','target_ye','target_proj'].forEach(id => t += parseFloat(document.getElementById(id)?.value || 0));
-        document.getElementById('totalCell').innerText = t.toLocaleString();
-    }
-
-    function renderTimelineUI() {
-        let rH = '<td>職等</td>', sH = '<td>月薪</td>';
-        ['Q1','Q2','Q3','Q4'].forEach(q => {
-            rH += `<td><select onchange="timelineData['${q}'].r=this.value; runLiveCalc()"><option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option><option value="L4">L4</option></select></td>`;
-            sH += `<td><input type="number" value="${timelineData[q].s}" oninput="timelineData['${q}'].s=this.value; runLiveCalc()" style="width:80px;"></td>`;
-        });
-        document.getElementById('tmRankRow').innerHTML = rH; document.getElementById('tmSalaryRow').innerHTML = sH;
-        document.querySelectorAll('#tmRankRow select').forEach((s,i) => s.value = timelineData['Q'+(i+1)].r);
-    }
-
-    async function updateHistoryCharts() {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistoryComparison", empName: document.getElementById('selEmp').value }) });
-        const r = await res.json(); if(r.status !== "success") return;
-        const sorted = r.history.sort((a,b)=>a.year-b.year); const labels = sorted.map(d => d.year+'年');
-        const ctx1 = document.getElementById('historyCompareChart').getContext('2d'); if(historyCompareChart) historyCompareChart.destroy();
-        historyCompareChart = new Chart(ctx1, { type: 'bar', data: { labels: labels, datasets: [{ label: '總額', data: sorted.map(d => d.total), backgroundColor: '#3498db' }] }, options: { maintainAspectRatio: false, plugins: { datalabels: { display: true, align:'top', formatter: v => v.toLocaleString() } } } });
-    }
-
-    function askPassword() { const p = prompt("主管授權密碼"); if(p === "0000") { document.getElementById('adminZone').style.display = 'block'; } }
 
     async function loadSalaryHistory() {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", name: document.getElementById('selEmp').value }) });
         const r = await res.json();
-        let h = `<table class="history-table"><thead><tr><th>日期</th><th>薪資</th><th>職等</th><th>備註</th></tr></thead><tbody>`;
-        r.history.forEach(i => h += `<tr><td>${new Date(i[1]).toLocaleDateString()}</td><td>$${i[2].toLocaleString()}</td><td>${i[3]}</td><td>${i[5]}</td></tr>`);
+        let h = `<table class="history-table"><thead><tr><th>日期</th><th>薪資</th><th>備註</th></tr></thead><tbody>`;
+        r.history.forEach(i => {
+            // 💡 修正日期報錯：只取 YYYY-MM-DD
+            const dateStr = i[1].toString().split('T')[0];
+            h += `<tr><td>${dateStr}</td><td>$${i[2].toLocaleString()}</td><td>${i[5]}</td></tr>`;
+        });
         document.getElementById('salaryHistoryContainer').innerHTML = h + `</tbody></table>`;
-    }
-
-    async function doSaveSalary() {
-        const d = { action: "saveSalaryLog", empName: document.getElementById('selEmp').value, date: document.getElementById('newSDate').value, amount: document.getElementById('newSAmt').value, level: "L1", note: "調薪" };
-        await fetch(API_URL, { method: "POST", body: JSON.stringify(d) }); alert("儲存成功"); loadSalaryHistory();
     }
 </script>
 </body>
