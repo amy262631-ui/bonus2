@@ -2,164 +2,156 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>獎金管理系統 V2 - 完整功能版</title>
+    <title>獎金及薪資管理系統 V2 - 完整功能版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; }
-        body { font-family: "Microsoft JhengHei"; background: var(--bg); padding: 20px; font-size: 14pt; }
+        /* 1. 完整沿用您原本的視覺設計與字體大小 */
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --project: #e67e22; --bg: #f4f7f6; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); padding: 20px; font-size: 14pt; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; }
         
-        /* V2 人員矩陣 */
-        .staff-matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .staff-btn { background: white; border: 2px solid #ddd; padding: 15px; border-radius: 12px; text-align: center; cursor: pointer; transition: 0.3s; position: relative; }
-        .staff-btn.active { border-color: var(--accent); background: #e3f2fd; transform: scale(1.05); }
-        .staff-btn .rank-tag { position: absolute; top: 5px; right: 5px; font-size: 10px; background: #eee; padding: 2px 4px; border-radius: 4px; }
+        /* V2 分頁標籤樣式 */
+        .nav-bar { display: flex; gap: 15px; margin-bottom: 25px; }
+        .nav-btn { flex: 1; padding: 18px; font-size: 1.4rem; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; background: #dcdde1; color: #7f8c8d; transition: 0.3s; }
+        .nav-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
 
-        /* 您原本的輸入框與報表樣式 (14pt/18px) */
-        .q-score { width: 85px; height: 45px; text-align: center; font-size: 1.2rem; border: 1px solid #ddd; border-radius: 8px; font-weight: bold; }
-        .score-container { display: flex; flex-direction: column; gap: 15px; padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 8px solid var(--primary); margin-bottom: 20px; }
-        .avg-display { background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; }
+        /* 您原本的獎金系統介面樣式 */
+        .header-controls { display: flex; gap: 20px; align-items: center; margin-bottom: 25px; }
+        .score-container { display: flex; flex-direction: column; gap: 12px; padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 8px solid var(--primary); margin-bottom: 20px; }
+        .score-grid { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .q-score { width: 85px; height: 45px; text-align: center; font-size: 1.25rem; border: 1px solid #ddd; border-radius: 8px; font-weight: bold; }
+        .avg-display { min-width: 180px; background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-left: auto; font-size: 1.3rem; font-weight: bold; }
+        .target-input { width: 130px; height: 50px; color: var(--danger); font-size: 1.5rem; border: 2px solid var(--danger); text-align: center; font-weight: bold; background: #fff5f5; border-radius: 8px; }
         
-        /* 報表專用樣式 */
-        .excel-report { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .excel-report th, .excel-report td { border: 1px solid #000; padding: 12px; text-align: center; font-size: 18px; }
+        /* 薪資歷史表格樣式 */
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .history-table th, .history-table td { border-bottom: 1px solid #ddd; padding: 15px; text-align: center; }
+        .salary-input-box { background: #eef7ff; padding: 25px; border-radius: 12px; border: 2px solid var(--accent); margin-top: 30px; }
+
+        /* 報表 Modal */
+        #reportModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; overflow-y: auto; padding: 40px 20px; }
+        .report-content { background: white; max-width: 1100px; margin: 0 auto; padding: 40px; border-radius: 15px; position: relative; }
+        .excel-report { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
+        .excel-report th, .excel-report td { border: 1px solid #000; padding: 12px 8px; font-size: 18px; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2 style="margin-top:0;">👤 選擇人員</h2>
-    <div id="staffMatrix" class="staff-matrix">載入名單中...</div>
+<div class="nav-bar">
+    <button id="navBonus" class="nav-btn active" onclick="switchPage('bonus')">💰 獎金試算 (原本功能)</button>
+    <button id="navSalary" class="nav-btn" onclick="switchPage('salary')">📈 薪資管理 (歷史存摺)</button>
 </div>
 
-<div class="card">
-    <div style="display:flex; gap:20px; align-items:center; margin-bottom:20px;">
-        <span style="font-weight:bold;">📅 年度：</span>
-        <select id="calcYear" onchange="refreshAll()" style="padding:10px; font-size:1.1rem; border-radius:8px;">
-            <option value="2024">2024</option>
-            <option value="2025" selected>2025</option>
-        </select>
-        <button class="btn" style="background:var(--success); color:white; padding:10px 20px; border:none; border-radius:8px;" onclick="saveData()">💾 儲存</button>
-        <button id="unlockBtn" style="background:var(--danger); color:white; padding:10px 20px; border:none; border-radius:8px; margin-left:auto;" onclick="verifyAdmin()">🔒 主管授權</button>
+<div id="pageBonus">
+    <div class="card">
+        <div class="header-controls">
+            <span style="font-weight:bold;">👤 人員：</span>
+            <select id="selEmp" onchange="initUI()"></select>
+            <span style="font-weight:bold;">📅 年度：</span>
+            <select id="calcYear" onchange="autoCalc(true)">
+                <option value="2024">2024</option>
+                <option value="2025" selected>2025</option>
+                <option value="2026">2026</option>
+            </select>
+            <button class="nav-btn" style="background:var(--success); color:white; flex:none; padding:10px 25px;" onclick="handleFinalSave()">💾 儲存核定</button>
+            <button id="unlockBtn" class="nav-btn" style="background:var(--danger); color:white; flex:none; padding:10px 25px; margin-left:auto;" onclick="verifyAdmin()">🔒 主管授權</button>
+        </div>
+
+        <div class="score-container">
+            <div style="font-size: 1.3rem; font-weight:bold; color:var(--primary); margin-bottom: 10px;">🗓️ 年度績效評分</div>
+            <div id="annualInputs" class="score-grid"></div>
+            <div class="avg-display">年度平均：<span id="avgSpan">0.00</span></div>
+        </div>
+        
+        <div style="height:350px;"><canvas id="scoreChart"></canvas></div>
     </div>
 
-    <div class="score-container" id="perfSection">
-        <div id="inputGrid" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
-        <div class="avg-display">年度平均分數：<span id="avgSpan">0.00</span></div>
+    <div id="adminZone" style="display:none;" class="card">
+        <h2 style="color:var(--danger);">主管核定區 (與 Master 連動)</h2>
+        <div id="adminTableContent"></div>
     </div>
-
-    <div style="height:350px;"><canvas id="mainChart"></canvas></div>
 </div>
 
-<div id="adminZone" style="display:none;" class="card">
-    <h3 style="color:var(--danger);">主管獎金核定 (含手動調整)</h3>
-    <div id="resultTableContainer"></div>
-    <div style="margin-top:20px; display:flex; gap:10px;">
-        <button onclick="openPersonalReport()">📄 個人核定報表</button>
-        <button onclick="downloadChart()">🖼️ 下載趨勢圖</button>
+<div id="pageSalary" style="display:none;">
+    <div class="card">
+        <h2 style="color:var(--accent);">個人薪資成長軌跡</h2>
+        <div id="salaryHistoryList">請先選擇人員</div>
+
+        <div class="salary-input-box">
+            <h3>🖋️ 2026 薪資調整決議 (僅存入 Log)</h3>
+            <div style="display:flex; gap:15px; flex-wrap:wrap;">
+                <div>生效日期：<br><input type="date" id="newSDate" class="q-score" style="width:200px;"></div>
+                <div>調整月薪：<br><input type="number" id="newSAmt" class="q-score" style="width:150px;"></div>
+                <div>職等：<br><select id="newSRank" class="q-score"><option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option><option value="L4">L4</option></select></div>
+            </div>
+            <button class="nav-btn" style="background:var(--accent); color:white; width:100%; margin-top:20px;" onclick="saveSalaryLog()">💾 儲存並寫入薪資存摺</button>
+        </div>
     </div>
 </div>
+
+<div id="reportModal"><div class="report-content" id="reportInner"></div></div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbxmNA0AYmcKK5x4iKZz0FwujvvtS4nioZ7fjXLe-oBlaye6qRfIf_WV8gp-Fj9vZPe1OA/exec";
-    let selectedEmp = "", selectedRank = "", selectedSalary = 0, yearConfigs = {};
-    let chartObj = null;
+    const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
+    let selectedEmp = "", timelineData = {};
 
-    // 1. 初始化名單
-    window.onload = () => {
-        fetch(API_URL, {method:"POST", body:JSON.stringify({action:"getStaff"})})
-        .then(res => res.json()).then(r => {
-            document.getElementById('staffMatrix').innerHTML = r.data.map(s => `
-                <div class="staff-btn" onclick="selectEmp(this, '${s[0]}', '${s[3]}')">
-                    <span class="rank-tag">${s[1]}</span>
-                    <div style="font-size:1.2rem; font-weight:bold;">${s[0]}</div>
-                    <div style="font-size:0.8rem; color:gray;">${new Date(s[3]).getFullYear()}入職</div>
-                </div>
-            `).join('');
-        });
-    };
-
-    // 2. 選擇人員後的聯動
-    async function selectEmp(el, name, hireDate) {
-        selectedEmp = name;
-        document.querySelectorAll('.staff-btn').forEach(b => b.classList.remove('active'));
-        el.classList.add('active');
-
-        // 抓取該年度起始薪資
-        const year = document.getElementById('calcYear').value;
-        const res = await fetch(API_URL, {method:"POST", body:JSON.stringify({
-            action:"getSalary", name:name, date: year + "-01-01"
-        })});
-        const r = await res.json();
-        selectedSalary = r.salary;
-        selectedRank = r.rank;
-
-        // 抓取年度參數
-        const resConfig = await fetch(API_URL, {method:"POST", body:JSON.stringify({
-            action:"getConfigs", year: year
-        })});
-        const rC = await resConfig.json();
-        yearConfigs = rC.yearConfigs;
-
-        renderInputs(); // 依職等渲染 12個月或 4季
-    }
-
-    // 3. 渲染輸入框 (保留 L1 不同邏輯)
-    function renderInputs() {
-        const grid = document.getElementById('inputGrid');
-        const isL1 = (selectedRank === "L1");
-        const count = isL1 ? 12 : 4;
-        const labels = isL1 ? ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"] : ["第一季","第二季","第三季","第四季"];
-        
-        grid.innerHTML = labels.map((l, i) => `
-            <div style="text-align:center;">
-                <div style="font-size:0.9rem;">${l}</div>
-                <input type="number" class="q-score" value="80" oninput="runCalculation()">
-            </div>
-        `).join('');
-        
-        runCalculation();
-    }
-
-    // 4. 核心計算引擎 (保留您原本的所有公式)
-    function runCalculation() {
-        const inputs = document.querySelectorAll('.q-score');
-        let total = 0;
-        inputs.forEach(i => total += parseFloat(i.value || 0));
-        const avg = (total / inputs.length).toFixed(2);
-        document.getElementById('avgSpan').innerText = avg;
-        
-        updateChart(Array.from(inputs).map(i => i.value));
-        updateAdminTable(avg);
-    }
-
-    // 5. 圖表功能 (完整保留)
-    function updateChart(data) {
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        if(chartObj) chartObj.destroy();
-        chartObj = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.length === 12 ? ["1","2","3","4","5","6","7","8","9","10","11","12"] : ["Q1","Q2","Q3","Q4"],
-                datasets: [{ label: '評分趨勢', data: data, borderColor: '#3498db', tension: 0.3, fill: true }]
-            },
-            options: { maintainAspectRatio: false }
-        });
-    }
-
-    // 6. 主管權限驗證
-    function verifyAdmin() {
-        const p = prompt("請輸入授權密碼：");
-        if(p === "0000") {
-            document.getElementById('adminZone').style.display = 'block';
-            document.getElementById('unlockBtn').innerText = "✅ 已授權";
+    // 1. 分頁切換
+    function switchPage(page) {
+        if(page === 'salary') {
+            const pwd = prompt("最高權限密碼：");
+            if(pwd !== "0000") return alert("無權限");
+            document.getElementById('pageBonus').style.display = 'none';
+            document.getElementById('pageSalary').style.display = 'block';
+            document.getElementById('navBonus').classList.remove('active');
+            document.getElementById('navSalary').classList.add('active');
+            loadSalaryHistory();
         } else {
-            alert("密碼錯誤");
+            document.getElementById('pageSalary').style.display = 'none';
+            document.getElementById('pageBonus').style.display = 'block';
+            document.getElementById('navSalary').classList.remove('active');
+            document.getElementById('navBonus').classList.add('active');
         }
     }
 
-    // 剩餘功能：saveData, openPersonalReport (PDF樣式), downloadChart 等...
+    // 2. 初始人員名單
+    window.onload = async () => {
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getStaffList" }) });
+        const r = await res.json();
+        document.getElementById('selEmp').innerHTML = r.data.map(e => `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`).join('');
+        initUI();
+    };
+
+    // 3. 抓取薪資歷史
+    async function loadSalaryHistory() {
+        const name = document.getElementById('selEmp').value;
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", name: name }) });
+        const r = await res.json();
+        let html = `<table class="history-table"><thead><tr><th>生效日期</th><th>薪資金額</th><th>職等</th><th>變動說明</th></tr></thead><tbody>`;
+        r.history.forEach(h => {
+            html += `<tr><td>${new Date(h[1]).toLocaleDateString()}</td><td>$${h[2].toLocaleString()}</td><td>${h[3]}</td><td>${h[5]}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+        document.getElementById('salaryHistoryList').innerHTML = html;
+    }
+
+    // 4. 儲存薪資決議
+    async function saveSalaryLog() {
+        const name = document.getElementById('selEmp').value;
+        const data = {
+            action: "saveSalaryLog",
+            empName: name,
+            date: document.getElementById('newSDate').value,
+            amount: document.getElementById('newSAmt').value,
+            level: document.getElementById('newSRank').value,
+            note: "2026 薪資調整"
+        };
+        await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
+        alert("決議已儲存");
+        loadSalaryHistory();
+    }
+
+    // 💡 此處貼回您原本強大的：runLiveCalc, autoCalc, initUI, openReport 等所有獎金引擎代碼...
 </script>
 </body>
 </html>
