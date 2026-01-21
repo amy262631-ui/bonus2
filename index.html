@@ -81,30 +81,31 @@
     };
 
     // --- 1. 職等判定與格子生成 (解決全部都是 Q1-Q4 的問題) ---
-    function initUI() {
-        const sel = document.getElementById('selEmp');
-        if (sel.selectedIndex === -1) return;
-        
-        const opt = sel.options[sel.selectedIndex];
-        const rank = opt.getAttribute('data-rank'); // 強制讀取職等
-        const isL1 = (rank === 'L1');
+   function initUI() {
+    const sel = document.getElementById('selEmp');
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
 
-        console.log("當前選擇：", opt.value, "職等：", rank); // 除錯用
+    // 取得職等字串並轉為大寫，避免空格或大小寫影響
+    let rank = opt.getAttribute('data-rank').toString().toUpperCase().trim();
+    let isL1 = (rank === 'L1');
 
-        // 生成輸入格
-        let h = '';
-        const count = isL1 ? 12 : 4;
-        for (let i = 1; i <= count; i++) {
-            h += `<div class="input-group">
-                    <span class="input-label" style="font-size:1rem; font-weight:bold; color:#555;">${isL1 ? i + '月' : 'Q' + i}</span>
-                    <input type="number" class="q-score ann-in" value="80" oninput="runLiveCalc()">
-                  </div>`;
-        }
-        document.getElementById('annualInputs').innerHTML = h;
-        
-        // 2. 切換人員後，立即同步該員在該年度的歷史分數與參數
-        autoCalc(true);
+    console.log("選擇人員：", opt.value, " 抓到的職等：", rank, " 是否為L1：", isL1);
+
+    // 生成輸入格
+    let h = '';
+    const count = isL1 ? 12 : 4;
+    for (let i = 1; i <= count; i++) {
+        h += `<div class="input-group">
+                <span class="input-label">${isL1 ? i + '月' : 'Q' + i}</span>
+                <input type="number" class="q-score ann-in" value="80" oninput="runLiveCalc()">
+              </div>`;
     }
+    document.getElementById('annualInputs').innerHTML = h;
+    
+    // 立即同步年度分數
+    autoCalc(true);
+}
 
     // --- 2. 同步後端歷史分數 (解決分數都是 80 且沒變化的問題) ---
     async function autoCalc(forceSync = false) {
