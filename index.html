@@ -123,6 +123,13 @@
         </div>
         
         <div class="card">
+            <div id="adminZone" style="display:none;">
+    <div class="card">
+        <h2>📈 歷年獎金對比 (雙色長條圖)</h2>
+        <div style="height:350px;">
+            <canvas id="historyCompareChart"></canvas> </div>
+        
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
     <h2>📈 歷年總獎金成長趨勢 (折線圖)</h2>
     <div style="height:350px;">
         <canvas id="historyTrendChart"></canvas> 
@@ -378,15 +385,30 @@
     }
 
     let historyTrendChart = null; 
-    async function updateHistoryCharts() {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistoryComparison", empName: document.getElementById('selEmp').value }) });
+   async function updateHistoryCharts() {
+    // 💡 第一步：檢查畫布是否存在，防止報錯
+    const canvas1 = document.getElementById('historyCompareChart');
+    if (!canvas1) {
+        console.warn("找不到 historyCompareChart 畫布，略過更新。");
+        return; 
+    }
+
+    try {
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify({ action: "getHistoryComparison", empName: document.getElementById('selEmp').value }) 
+        });
         const r = await res.json();
+        
         if(r.status === "success" && r.history.length > 0) {
             const sortedHistory = r.history.sort((a, b) => a.year - b.year);
             const labels = sortedHistory.map(d => d.year + '年');
-            const ctx1 = document.getElementById('historyCompareChart').getContext('2d');
-            if(historyCompareChart) historyCompareChart.destroy();
-            historyCompareChart = new Chart(ctx1, {
+            
+            // 繪製長條圖
+            const ctx1 = canvas1.getContext('2d');
+            if(window.historyCompareChartInstance) window.historyCompareChartInstance.destroy();
+            
+            window.historyCompareChartInstance = new Chart(ctx1, {
                 type: 'bar',
                 data: {
                     labels: labels,
@@ -418,18 +440,16 @@
                     scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
                 }
             });
+            
+            // 💡 執行折線圖繪製
             renderTrendChart(labels, sortedHistory.map(d => Number(d.total || 0)));
         }
-    }
+    } catch (e) { console.error("更新歷史圖表失敗:", e); }
+}
 
-    function renderTrendChart(labels, data) {
+function renderTrendChart(labels, data) {
     const canvas = document.getElementById('historyTrendChart');
-    
-    // 💡 防錯檢查：如果找不到畫布，就先跳出，不要報錯
-    if (!canvas) {
-        console.warn("找不到 ID 為 historyTrendChart 的畫布元素，跳過繪製折線圖。");
-        return; 
-    }
+    if (!canvas) return; // 💡 防錯：元素不存在則不執行
 
     const ctx2 = canvas.getContext('2d');
     if(window.historyTrendChartInstance) window.historyTrendChartInstance.destroy();
