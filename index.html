@@ -180,57 +180,55 @@
     window.onload = async () => {
         const res = await fetch(API_URL);
         const r = await res.json();
-        document.getElementById('selEmp').innerHTML = r.data.map(e => `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`).join('');
+        document.getElementById('selEmp').innerHTML = r.data.map(e => 
+    `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`
+).join('');
         initUI();
     };
 
    function initUI() {
-        const sel = document.getElementById('selEmp');
-        if (!sel || !sel.options.length) return; // 安全檢查
+    const sel = document.getElementById('selEmp');
+    if (!sel || sel.selectedIndex === -1) return;
 
-        const opt = sel.options[sel.selectedIndex];
-        
-        // 💡 關鍵修正：確保抓取 data-rank 並強制轉大寫，去除空格
-        const rank = (opt.getAttribute('data-rank') || "").trim().toUpperCase();
-        const salary = opt.getAttribute('data-salary') || 0;
-        const isL1 = (rank === 'L1');
+    const opt = sel.options[sel.selectedIndex];
+    
+    // 💡 強化讀取：確保抓到正確的職等與薪資
+    const rank = (opt.getAttribute('data-rank') || "").trim().toUpperCase();
+    const salary = opt.getAttribute('data-salary') || 0;
+    const isL1 = (rank === 'L1');
 
-        console.log("偵測到人員：" + opt.value + " | 職等：" + rank + " | 是否為L1：" + isL1); // 方便你檢查
+    console.log("當前選擇：" + opt.value + " | 職等：" + rank + " | L1判斷：" + isL1);
 
-        // 初始化當前人員的時間軸數據
-        timelineData = { 
-            Q1:{r: rank, s: salary}, 
-            Q2:{r: rank, s: salary}, 
-            Q3:{r: rank, s: salary}, 
-            Q4:{r: rank, s: salary} 
-        };
+    timelineData = { 
+        Q1:{r: rank, s: salary}, 
+        Q2:{r: rank, s: salary}, 
+        Q3:{r: rank, s: salary}, 
+        Q4:{r: rank, s: salary} 
+    };
 
-        let h1 = '', h2 = '';
-        
-        // 💡 邏輯修正：如果是 L1 人員，生成 12 個月；否則生成 Q1~Q4
-        const annualCount = isL1 ? 12 : 4;
-        for(let i = 1; i <= annualCount; i++) {
-            const label = isL1 ? i + '月' : 'Q' + i;
-            h1 += `<div class="input-group">
-                    <span class="input-label">${label}</span>
-                    <input type="number" class="q-score ann-in" oninput="runLiveCalc()">
-                   </div>`;
-        }
-
-        // 專案評分固定為 12 個月
-        for(let i = 1; i <= 12; i++) {
-            h2 += `<div class="input-group">
-                    <span class="input-label">${i}月</span>
-                    <input type="number" class="q-score prj-in" oninput="runLiveCalc()">
-                   </div>`;
-        }
-        
-        document.getElementById('annualInputs').innerHTML = h1; 
-        document.getElementById('projInputs').innerHTML = h2;
-        
-        // 執行自動計算與資料同步
-        autoCalc(true); 
+    let h1 = '', h2 = '';
+    // 💡 關鍵：根據 isL1 決定生成的數量與標籤
+    const annualCount = isL1 ? 12 : 4;
+    for(let i = 1; i <= annualCount; i++) {
+        const label = isL1 ? i + '月' : 'Q' + i;
+        h1 += `<div class="input-group">
+                <span class="input-label">${label}</span>
+                <input type="number" class="q-score ann-in" oninput="runLiveCalc()">
+               </div>`;
     }
+
+    for(let i = 1; i <= 12; i++) {
+        h2 += `<div class="input-group">
+                <span class="input-label">${i}月</span>
+                <input type="number" class="q-score prj-in" oninput="runLiveCalc()">
+               </div>`;
+    }
+    
+    document.getElementById('annualInputs').innerHTML = h1; 
+    document.getElementById('projInputs').innerHTML = h2;
+    
+    autoCalc(true); 
+}}
 
 
     function runLiveCalc() {
@@ -669,37 +667,28 @@ function renderReportCharts(data) {
     }
 
     // --- 局部新增 1：分頁切換控制 (不影響原本邏輯) ---
-   function switchTab(tab) {
-        // 抓取原本系統中所有的主要區塊 (排除頂部控制區)
-        const mainSections = document.querySelectorAll('body > .card, #adminZone, h2');
-        const salaryPage = document.getElementById('salaryPage');
+  function switchTab(tab) {
+    const mainSections = document.querySelectorAll('body > .card, #adminZone');
+    const salaryPage = document.getElementById('salaryPage');
 
-        if (tab === 'salary') {
-            // 隱藏所有獎金相關內容，但保留頂部選擇人員的那個卡片
-            mainSections.forEach(el => {
-                // 如果這個卡片裡面有 #selEmp，就不要隱藏它
-                if (el !== salaryPage && !el.querySelector('#selEmp')) {
-                    el.style.display = 'none';
-                }
-            });
-            salaryPage.style.display = 'block';
-            loadSalaryHistoryLocal(); 
-        } else {
-            // 恢復獎金試算 UI
-            mainSections.forEach(el => {
-                if (el !== salaryPage) {
-                    // 恢復 score-container 原始彈性佈局
-                    if(el.classList.contains('score-container')) el.style.display = 'flex';
-                    else el.style.display = 'block';
-                }
-            });
-            // 依照主管授權狀態決定核定區
-            const isUnlocked = document.getElementById('unlockBtn').innerText.includes('已授權');
-            document.getElementById('adminZone').style.display = isUnlocked ? 'block' : 'none';
-            salaryPage.style.display = 'none';
-        }
+    if (tab === 'salary') {
+        // 隱藏獎金內容
+        mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'none'; });
+        salaryPage.style.display = 'block';
+        
+        // 💡 關鍵修正：切換分頁時重新抓取「當前選單」的人名進行查詢
+        loadSalaryHistoryLocal(); 
+    } else {
+        // 恢復獎金試算
+        mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'block'; });
+        const isUnlocked = document.getElementById('unlockBtn').innerText.includes('已授權');
+        document.getElementById('adminZone').style.display = isUnlocked ? 'block' : 'none';
+        salaryPage.style.display = 'none';
+        
+        // 💡 關鍵修正：點選返回時，確保 UI 重新同步一次
+        initUI();
     }
-
+}
    // --- 局部更新：AJAX 請求薪資歷史資料 (含調幅計算與欄位對調) ---
 async function loadSalaryHistoryLocal() {
     const name = document.getElementById('selEmp').value;
