@@ -636,10 +636,86 @@ function renderReportCharts(data) {
         } catch (err) { alert("❌ 儲存失敗"); }
     }
 
-    function downloadChart(chartId, bName) {
+   function downloadChart(chartId, bName) {
         const canvas = document.getElementById(chartId); const link = document.createElement('a');
         link.href = canvas.toDataURL('image/jpeg', 0.9); link.download = `${document.getElementById('selEmp').value}_${bName}.jpg`; link.click();
     }
+
+    // --- 局部新增 1：分頁切換控制 (不影響原本邏輯) ---
+    function switchTab(tab) {
+        // 抓取原本系統中所有的主要大卡片區塊
+        const mainSections = document.querySelectorAll('body > .card, #adminZone');
+        const salaryPage = document.getElementById('salaryPage');
+
+        if (tab === 'salary') {
+            // 隱藏所有獎金相關內容，顯示薪資頁面
+            mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'none'; });
+            salaryPage.style.display = 'block';
+            loadSalaryHistoryLocal(); 
+        } else {
+            // 恢復獎金試算 UI
+            mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'block'; });
+            // 依照原本的主管授權狀態決定是否顯示核定區
+            const isUnlocked = document.getElementById('unlockBtn').innerText.includes('已授權');
+            document.getElementById('adminZone').style.display = isUnlocked ? 'block' : 'none';
+            salaryPage.style.display = 'none';
+        }
+    }
+
+    // --- 局部新增 2：AJAX 請求薪資歷史資料 ---
+    async function loadSalaryHistoryLocal() {
+        const name = document.getElementById('selEmp').value;
+        document.getElementById('salaryTargetName').innerText = name;
+        const body = document.getElementById('salaryBody');
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; font-size:1.2rem;">🔍 正在檢索薪資紀錄...</td></tr>';
+
+        try {
+            const res = await fetch(API_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
+            });
+            const r = await res.json();
+            
+            if (r.status === "success" && r.history.length > 0) {
+                body.innerHTML = r.history.map(h => `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="text-align:center; padding:15px;">${h.date}</td>
+                        <td style="font-weight:bold; color:var(--success); text-align:right; padding:15px;">$${Number(h.amount).toLocaleString()}</td>
+                        <td style="text-align:center;">${h.rank}</td>
+                        <td style="text-align:center;">${h.type || '-'}</td>
+                        <td style="text-align:left; padding:15px;">${h.note || '-'}</td>
+                    </tr>
+                `).join('');
+            } else {
+                body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#666;">查無調薪紀錄</td></tr>';
+            }
+        } catch (e) { 
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:red;">❌ 無法連線至後台程式</td></tr>'; 
+        }
+    }
 </script>
+
+<div id="salaryPage" style="display:none;" class="card">
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--accent); padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="color:var(--primary); margin: 0;">💵 薪資變動歷史 - <span id="salaryTargetName"></span></h2>
+        <button class="btn" style="background:#7f8c8d;" onclick="switchTab('main')">⬅️ 返回獎金試算</button>
+    </div>
+    
+    <div style="overflow-x: auto;">
+        <table class="excel-report" style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background:#f4f4f4;">
+                    <th style="width:180px;">生效日期</th>
+                    <th style="width:180px;">薪資金額</th>
+                    <th style="width:120px;">職等</th>
+                    <th style="width:150px;">變動類別</th>
+                    <th>決策備註</th>
+                </tr>
+            </thead>
+            <tbody id="salaryBody"></tbody>
+        </table>
+    </div>
+</div>
+
 </body>
 </html>
