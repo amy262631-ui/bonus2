@@ -223,38 +223,51 @@
     }
 
     function initUI() {
-    const sel = document.getElementById('selEmp');
-    const opt = sel.options[sel.selectedIndex];
-    
-    // 💡 關鍵修正：確保強制轉成大寫進行比對
-    const rank = (opt.getAttribute('data-rank') || "").toUpperCase();
-    const isL1 = (rank === 'L1');
-    
-    // 更新當前人員的薪資與職等資訊
-    timelineData = { 
-        Q1:{r: rank, s: opt.dataset.salary}, 
-        Q2:{r: rank, s: opt.dataset.salary}, 
-        Q3:{r: rank, s: opt.dataset.salary}, 
-        Q4:{r: rank, s: opt.dataset.salary} 
-    };
+        const sel = document.getElementById('selEmp');
+        if (!sel.options.length) return; // 防止選單尚未載入
 
-    let h1 = '', h2 = '';
-    // 💡 根據職等決定生成 12 個月還是 4 季的輸入框
-    const count = isL1 ? 12 : 4;
-    for(let i=1; i<=count; i++) {
-        h1 += `<div class="input-group"><span class="input-label">${isL1 ? i+'月' : 'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
+        const opt = sel.options[sel.selectedIndex];
+        
+        // 💡 關鍵修正：直接從選單屬性抓取職等，並強制轉大寫
+        const currentRank = (opt.getAttribute('data-rank') || "").trim().toUpperCase();
+        const currentSalary = opt.getAttribute('data-salary') || 0;
+        const isL1 = (currentRank === 'L1');
+
+        console.log("當前人員職等:", currentRank, "是否為 L1:", isL1); // 調試用
+
+        // 初始化時間軸資料
+        timelineData = { 
+            Q1:{r: currentRank, s: currentSalary}, 
+            Q2:{r: currentRank, s: currentSalary}, 
+            Q3:{r: currentRank, s: currentSalary}, 
+            Q4:{r: currentRank, s: currentSalary} 
+        };
+
+        // 💡 根據職等生成輸入框：L1 生成 12 個月，其餘 4 季
+        let h1 = '';
+        const annualCount = isL1 ? 12 : 4;
+        for(let i=1; i<=annualCount; i++) {
+            const label = isL1 ? i + '月' : 'Q' + i;
+            h1 += `<div class="input-group">
+                    <span class="input-label">${label}</span>
+                    <input type="number" class="q-score ann-in" oninput="runLiveCalc()">
+                   </div>`;
+        }
+
+        let h2 = '';
+        for(let i=1; i<=12; i++) {
+            h2 += `<div class="input-group">
+                    <span class="input-label">${i}月</span>
+                    <input type="number" class="q-score prj-in" oninput="runLiveCalc()">
+                   </div>`;
+        }
+        
+        document.getElementById('annualInputs').innerHTML = h1; 
+        document.getElementById('projInputs').innerHTML = h2;
+        
+        // 執行自動計算與資料回填
+        autoCalc(true); 
     }
-    
-    for(let i=1; i<=12; i++) {
-        h2 += `<div class="input-group"><span class="input-label">${i}月</span><input type="number" class="q-score prj-in" oninput="runLiveCalc()"></div>`;
-    }
-    
-    document.getElementById('annualInputs').innerHTML = h1; 
-    document.getElementById('projInputs').innerHTML = h2;
-    
-    // 重新載入該員在該年度的歷史儲存資料
-    autoCalc(true); 
-}
 
     function runLiveCalc() {
         const getAvg = (cls) => {
