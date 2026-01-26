@@ -186,19 +186,18 @@
         initUI();
     };
 
-   function initUI() {
+function initUI() {
     const sel = document.getElementById('selEmp');
     if (!sel || sel.selectedIndex === -1) return;
 
     const opt = sel.options[sel.selectedIndex];
     
-    // 💡 強化讀取：確保抓到正確的職等與薪資
+    // 💡 抓取最新的職等與薪資屬性
     const rank = (opt.getAttribute('data-rank') || "").trim().toUpperCase();
     const salary = opt.getAttribute('data-salary') || 0;
     const isL1 = (rank === 'L1');
 
-    console.log("當前選擇：" + opt.value + " | 職等：" + rank + " | L1判斷：" + isL1);
-
+    // 初始化 timelineData，這會跟「主管核定區」的輸入框連動
     timelineData = { 
         Q1:{r: rank, s: salary}, 
         Q2:{r: rank, s: salary}, 
@@ -207,7 +206,7 @@
     };
 
     let h1 = '', h2 = '';
-    // 💡 關鍵：根據 isL1 決定生成的數量與標籤
+    // 💡 判斷：L1 生成 12 個月框，其他職等生成 Q1~Q4 框
     const annualCount = isL1 ? 12 : 4;
     for(let i = 1; i <= annualCount; i++) {
         const label = isL1 ? i + '月' : 'Q' + i;
@@ -217,6 +216,7 @@
                </div>`;
     }
 
+    // 專案評分固定 12 個月
     for(let i = 1; i <= 12; i++) {
         h2 += `<div class="input-group">
                 <span class="input-label">${i}月</span>
@@ -227,9 +227,8 @@
     document.getElementById('annualInputs').innerHTML = h1; 
     document.getElementById('projInputs').innerHTML = h2;
     
-    autoCalc(true); 
+    autoCalc(true); // 觸發後端同步與獎金試算
 }
-
 
     function runLiveCalc() {
         const getAvg = (cls) => {
@@ -281,57 +280,64 @@
         } catch(e) { console.error("AutoCalc Error:", e); }
     }
 
-    function updateAdminTableUI(adjs = null) {
-        const cfg = baseResults.yearConfigs || {};
-        const rb = document.getElementById('resultBody');
-        if (!rb) return;
+  function updateAdminTableUI(adjs = null) {
+    const cfg = baseResults.yearConfigs || {};
+    const rb = document.getElementById('resultBody');
+    if (!rb) return;
 
-        const calcRef = (q, idx) => {
-            const r = timelineData[q].r;
-            const s = parseFloat(timelineData[q].s);
-            if (r === "L1") return parseFloat(cfg.L1_Fest_Over_6M || 1000);
-            const baseKey = `${r}_Base`;
-            const base = parseFloat(cfg[baseKey] || (r === "L2" ? 0.7 : (r === "L3" ? 1.0 : 1.5)));
-            const qScore = parseFloat(document.querySelectorAll('.ann-in')[idx]?.value || 0);
-            return Math.round(s * 0.25 * base * getPerfMult_Frontend(qScore, "quarterly"));
-        };
+    // 💡 核心邏輯：計算參考值時，抓取 timelineData 裡的最新 r (職等) 與 s (月薪)
+ // 在 updateAdminTableUI 的 calcRef 內部確保使用 timelineData 的資料
+const calcRef = (q, idx) => {
+    const r = timelineData[q].r; // 抓取前端畫面設定的職等
+    const s = parseFloat(timelineData[q].s); // 抓取前端畫面設定的月薪
+    
+    if (r === "L1") return parseFloat(cfg.L1_Fest_Over_6M || 1000);
+    
+    const baseKey = `${r}_Base`;
+    const base = parseFloat(cfg[baseKey] || (r === "L2" ? 0.7 : (r === "L3" ? 1.0 : 1.5)));
+    const qScore = parseFloat(document.querySelectorAll('.ann-in')[idx]?.value || 0);
+    
+    // ✅ 以畫面上顯示的月薪 s 計算
+    return Math.round(s * 0.25 * base * getPerfMult_Frontend(qScore, "quarterly"));
+};
 
-        let html = `<tr><td>${document.getElementById('selEmp').value}</td><td>${document.getElementById('calcYear').value}</td><td style="color:blue;font-weight:bold;">${document.getElementById('avgSpan').innerText}</td>`;
-        
-        const items = ['f1', 'f2', 'f3', 'ye', 'proj'];
-        items.forEach((item, i) => {
-            let ref = 0;
-            let displayVal = 0;
+    let html = `<tr><td>${document.getElementById('selEmp').value}</td><td>${document.getElementById('calcYear').value}</td><td style="color:blue;font-weight:bold;">${document.getElementById('avgSpan').innerText}</td>`;
+    
+    const items = ['f1', 'f2', 'f3', 'ye', 'proj'];
+    items.forEach((item, i) => {
+        let ref = 0;
+        let displayVal = 0;
 
-            if (item === 'proj') {
-                const projBase = adjs ? adjs[4] : (cfg.Project_Total || 80000);
-                const projMult = getProjectMultiplier_Frontend(document.getElementById('projAvgSpan').innerText);
-                ref = Math.round(projBase * projMult);
-                displayVal = ref + (adjs ? adjs[5] : 0);
-            } else if (item === 'ye') {
-                const q4Rank = timelineData.Q4.r;
-                const s = parseFloat(timelineData.Q4.s);
-                const yeBase = (q4Rank === "L1") ? parseFloat(cfg.L1_Over_1Y || 0.5) : parseFloat(cfg[`${q4Rank}_Base`] || 1.0);
-                ref = Math.round(s * yeBase * getPerfMult_Frontend(document.getElementById('avgSpan').innerText, "annual"));
-                displayVal = ref + (adjs ? adjs[3] : 0);
-            } else {
-                ref = calcRef("Q" + (i + 1), i);
-                displayVal = ref + (adjs ? adjs[i] : 0);
-            }
+        if (item === 'proj') {
+            const projBase = adjs ? adjs[4] : (cfg.Project_Total || 80000);
+            const projMult = getProjectMultiplier_Frontend(document.getElementById('projAvgSpan').innerText);
+            ref = Math.round(projBase * projMult);
+            displayVal = ref + (adjs ? adjs[5] : 0);
+        } else if (item === 'ye') {
+            const q4Status = timelineData.Q4; // 年終以 Q4 職等與薪資為準
+            const s = parseFloat(q4Status.s);
+            const r = q4Status.r;
+            const yeBase = (r === "L1") ? parseFloat(cfg.L1_Over_1Y || 0.5) : parseFloat(cfg[`${r}_Base`] || 1.0);
+            ref = Math.round(s * yeBase * getPerfMult_Frontend(document.getElementById('avgSpan').innerText, "annual"));
+            displayVal = ref + (adjs ? adjs[3] : 0);
+        } else {
+            ref = calcRef("Q" + (i + 1), i);
+            displayVal = ref + (adjs ? adjs[i] : 0);
+        }
 
-            html += `<td>
-                <span class="reference-text" id="ref_${item}">${item==='proj'?'試算':'參考'}:${ref.toLocaleString()}</span>
-                <span class="target-label">定案獎金：</span>
-                <input type="number" class="target-input" id="target_${item}" value="${displayVal}" oninput="refreshTotal()">
-            </td>`;
-        });
+        html += `<td>
+            <span class="reference-text" id="ref_${item}">${item==='proj'?'試算':'參考'}:${ref.toLocaleString()}</span>
+            <span class="target-label">定案獎金：</span>
+            <input type="number" class="target-input" id="target_${item}" value="${displayVal}" oninput="refreshTotal()">
+        </td>`;
+    });
 
-        html += `<input type="hidden" id="adj_proj_base" value="${adjs ? adjs[4] : 80000}">`;
-        html += `<td id="totalCell" class="total-cell">0</td></tr>`;
-        
-        rb.innerHTML = html;
-        refreshTotal();
-    }
+    html += `<input type="hidden" id="adj_proj_base" value="${adjs ? adjs[4] : 80000}">`;
+    html += `<td id="totalCell" class="total-cell">0</td></tr>`;
+    
+    rb.innerHTML = html;
+    refreshTotal();
+}
 
     // 💡 補齊缺失的績效倍率函式
     function getPerfMult_Frontend(score, type) {
@@ -354,14 +360,23 @@
     }
 
     function renderTimelineUI() {
-        let rH = '<td>職等</td>', sH = '<td>月薪</td>';
-        ['Q1','Q2','Q3','Q4'].forEach(q => {
-            rH += `<td><select onchange="timelineData['${q}'].r=this.value; runLiveCalc()"><option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option><option value="L4">L4</option></select></td>`;
-            sH += `<td><input type="number" value="${timelineData[q].s}" onfocus="isUserTyping=true" onblur="isUserTyping=false; runLiveCalc()" oninput="timelineData['${q}'].s=this.value" style="width:80px;"></td>`;
-        });
-        document.getElementById('tmRankRow').innerHTML = rH; document.getElementById('tmSalaryRow').innerHTML = sH;
-        document.querySelectorAll('#tmRankRow select').forEach((s,i) => s.value = timelineData['Q'+(i+1)].r);
-    }
+    let rH = '<td>職等</td>', sH = '<td>月薪</td>';
+    ['Q1','Q2','Q3','Q4'].forEach(q => {
+        // 當職等改變，觸發 runLiveCalc 會同步更新計算與圖表
+        rH += `<td><select onchange="timelineData['${q}'].r=this.value; runLiveCalc()"><option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option><option value="L4">L4</option></select></td>`;
+        // 💡 關鍵：在 oninput 加入 updateAdminTableUI()，手動改月薪時，獎金參考值會立刻更新
+        sH += `<td><input type="number" value="${timelineData[q].s}" 
+                onfocus="isUserTyping=true" 
+                onblur="isUserTyping=false; runLiveCalc()" 
+                oninput="timelineData['${q}'].s=this.value; updateAdminTableUI()" 
+                style="width:80px; text-align:center; font-weight:bold; color:blue;"></td>`;
+    });
+    document.getElementById('tmRankRow').innerHTML = rH; 
+    document.getElementById('tmSalaryRow').innerHTML = sH;
+    
+    // 設定下拉選單的初始選中值
+    document.querySelectorAll('#tmRankRow select').forEach((s,i) => s.value = timelineData['Q'+(i+1)].r);
+}
 
     function updateScoreChart() {
         const ctx = document.getElementById('scoreChart').getContext('2d'); if (scoreChart) scoreChart.destroy();
