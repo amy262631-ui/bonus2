@@ -682,25 +682,42 @@ function renderReportCharts(data) {
     }
 
     // --- 局部新增 1：分頁切換控制 (不影響原本邏輯) ---
-  function switchTab(tab) {
-    const mainSections = document.querySelectorAll('body > .card, #adminZone');
+function switchTab(tab) {
+    // 💡 抓取所有大區塊
+    const mainSections = document.querySelectorAll('body > .card, #adminZone, h2, .score-container');
     const salaryPage = document.getElementById('salaryPage');
 
     if (tab === 'salary') {
-        // 隱藏獎金內容
-        mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'none'; });
-        salaryPage.style.display = 'block';
+        // 隱藏獎金系統的所有元素
+        mainSections.forEach(el => {
+            // 關鍵：如果該元素不是 salaryPage，且不包含人員選擇選單，就隱藏
+            if (el !== salaryPage && !el.querySelector('#selEmp')) {
+                el.style.display = 'none';
+            }
+        });
         
-        // 💡 關鍵修正：切換分頁時重新抓取「當前選單」的人名進行查詢
+        // 💡 顯示薪資頁面並強制設定顯示模式
+        salaryPage.style.display = 'block';
+        salaryPage.style.visibility = 'visible'; 
+        
+        // 執行資料讀取
         loadSalaryHistoryLocal(); 
     } else {
-        // 恢復獎金試算
-        mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'block'; });
+        // 恢復獎金試算系統
+        mainSections.forEach(el => {
+            if (el !== salaryPage) {
+                if (el.classList.contains('score-container')) el.style.display = 'flex';
+                else el.style.display = 'block';
+            }
+        });
+        
+        // 恢復主管授權顯示邏輯
         const isUnlocked = document.getElementById('unlockBtn').innerText.includes('已授權');
         document.getElementById('adminZone').style.display = isUnlocked ? 'block' : 'none';
+        
         salaryPage.style.display = 'none';
         
-        // 💡 關鍵修正：點選返回時，確保 UI 重新同步一次
+        // 返回時重新初始化 UI 確保狀態同步
         initUI();
     }
 }
@@ -709,7 +726,9 @@ async function loadSalaryHistoryLocal() {
     const name = document.getElementById('selEmp').value;
     document.getElementById('salaryTargetName').innerText = name;
     const body = document.getElementById('salaryBody');
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; font-size:1.2rem;">🔍 正在檢索薪資紀錄...</td></tr>';
+    
+    // 先顯示讀取中，避免畫面上看起來是空的
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px;">🔍 正在檢索薪資紀錄...</td></tr>';
 
     try {
         const res = await fetch(API_URL, { 
@@ -718,19 +737,16 @@ async function loadSalaryHistoryLocal() {
         });
         const r = await res.json();
         
-        if (r.status === "success" && r.history.length > 0) {
-            // 💡 核心邏輯：r.history 已經是從新到舊排序
-            // 我們需要由舊到新計算漲幅，再顯示出來
+        if (r.status === "success" && r.history && r.history.length > 0) {
+            // 計算百分比邏輯 (如前所述)...
             let historyWithPercent = [];
             const sortedOldToNew = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
-
             sortedOldToNew.forEach((item, index) => {
                 let percentChange = "-";
                 if (index > 0) {
                     const prevAmount = sortedOldToNew[index - 1].amount;
-                    const currAmount = item.amount;
                     if (prevAmount > 0) {
-                        const diff = ((currAmount - prevAmount) / prevAmount) * 100;
+                        const diff = ((item.amount - prevAmount) / prevAmount) * 100;
                         percentChange = diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`;
                     }
                 }
@@ -738,17 +754,10 @@ async function loadSalaryHistoryLocal() {
                 historyWithPercent.push(item);
             });
 
-            // 回復為新到舊排序顯示
-            const displayData = historyWithPercent.reverse();
-
-            body.innerHTML = displayData.map(h => `
+            body.innerHTML = historyWithPercent.reverse().map(h => `
                 <tr style="border-bottom: 1px solid #eee;">
-                    <td style="font-weight:bold; color:var(--success); text-align:right; padding:15px;">
-                        $${Number(h.amount).toLocaleString()}
-                    </td>
-                    <td style="text-align:center; padding:15px; color: #d35400; font-weight: bold;">
-                        ${h.percent}
-                    </td>
+                    <td style="font-weight:bold; color:var(--success); text-align:right; padding:15px;">$${Number(h.amount).toLocaleString()}</td>
+                    <td style="text-align:center; padding:15px; color: #d35400; font-weight: bold;">${h.percent}</td>
                     <td style="text-align:center; padding:15px;">${h.date}</td>
                     <td style="text-align:center;">${h.rank}</td>
                     <td style="text-align:center;">${h.type || '-'}</td>
@@ -756,10 +765,10 @@ async function loadSalaryHistoryLocal() {
                 </tr>
             `).join('');
         } else {
-            body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">查無調薪紀錄</td></tr>';
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">查無此人的調薪紀錄</td></tr>';
         }
     } catch (e) { 
-        body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:red;">❌ 無法連線至後台程式</td></tr>'; 
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:red;">❌ 無法連線至後台，請確認部署版本</td></tr>'; 
     }
 }
 </script>
