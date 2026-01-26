@@ -700,37 +700,64 @@ function renderReportCharts(data) {
         }
     }
 
-    // --- 局部新增 2：AJAX 請求薪資歷史資料 ---
-    async function loadSalaryHistoryLocal() {
-        const name = document.getElementById('selEmp').value;
-        document.getElementById('salaryTargetName').innerText = name;
-        const body = document.getElementById('salaryBody');
-        body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; font-size:1.2rem;">🔍 正在檢索薪資紀錄...</td></tr>';
+   // --- 局部更新：AJAX 請求薪資歷史資料 (含調幅計算與欄位對調) ---
+async function loadSalaryHistoryLocal() {
+    const name = document.getElementById('selEmp').value;
+    document.getElementById('salaryTargetName').innerText = name;
+    const body = document.getElementById('salaryBody');
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; font-size:1.2rem;">🔍 正在檢索薪資紀錄...</td></tr>';
 
-        try {
-            const res = await fetch(API_URL, { 
-                method: "POST", 
-                body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
+    try {
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
+        });
+        const r = await res.json();
+        
+        if (r.status === "success" && r.history.length > 0) {
+            // 💡 核心邏輯：r.history 已經是從新到舊排序
+            // 我們需要由舊到新計算漲幅，再顯示出來
+            let historyWithPercent = [];
+            const sortedOldToNew = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            sortedOldToNew.forEach((item, index) => {
+                let percentChange = "-";
+                if (index > 0) {
+                    const prevAmount = sortedOldToNew[index - 1].amount;
+                    const currAmount = item.amount;
+                    if (prevAmount > 0) {
+                        const diff = ((currAmount - prevAmount) / prevAmount) * 100;
+                        percentChange = diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`;
+                    }
+                }
+                item.percent = percentChange;
+                historyWithPercent.push(item);
             });
-            const r = await res.json();
-            
-            if (r.status === "success" && r.history.length > 0) {
-                body.innerHTML = r.history.map(h => `
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="text-align:center; padding:15px;">${h.date}</td>
-                        <td style="font-weight:bold; color:var(--success); text-align:right; padding:15px;">$${Number(h.amount).toLocaleString()}</td>
-                        <td style="text-align:center;">${h.rank}</td>
-                        <td style="text-align:center;">${h.type || '-'}</td>
-                        <td style="text-align:left; padding:15px;">${h.note || '-'}</td>
-                    </tr>
-                `).join('');
-            } else {
-                body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#666;">查無調薪紀錄</td></tr>';
-            }
-        } catch (e) { 
-            body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:red;">❌ 無法連線至後台程式</td></tr>'; 
+
+            // 回復為新到舊排序顯示
+            const displayData = historyWithPercent.reverse();
+
+            body.innerHTML = displayData.map(h => `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="font-weight:bold; color:var(--success); text-align:right; padding:15px;">
+                        $${Number(h.amount).toLocaleString()}
+                    </td>
+                    <td style="text-align:center; padding:15px; color: #d35400; font-weight: bold;">
+                        ${h.percent}
+                    </td>
+                    <td style="text-align:center; padding:15px;">${h.date}</td>
+                    <td style="text-align:center;">${h.rank}</td>
+                    <td style="text-align:center;">${h.type || '-'}</td>
+                    <td style="text-align:left; padding:15px;">${h.note || '-'}</td>
+                </tr>
+            `).join('');
+        } else {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">查無調薪紀錄</td></tr>';
         }
+    } catch (e) { 
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:red;">❌ 無法連線至後台程式</td></tr>'; 
     }
+}
 </script>
 
 <div id="salaryPage" style="display:none;" class="card">
@@ -743,10 +770,11 @@ function renderReportCharts(data) {
         <table class="excel-report" style="width:100%; border-collapse: collapse;">
             <thead>
                 <tr style="background:#f4f4f4;">
-                    <th style="width:180px;">生效日期</th>
-                    <th style="width:180px;">薪資金額</th>
-                    <th style="width:120px;">職等</th>
-                    <th style="width:150px;">變動類別</th>
+                    <th style="width:150px;">薪資金額</th>
+                    <th style="width:100px;">調幅 %</th>
+                    <th style="width:150px;">生效日期</th>
+                    <th style="width:100px;">職等</th>
+                    <th style="width:120px;">變動類別</th>
                     <th>決策備註</th>
                 </tr>
             </thead>
