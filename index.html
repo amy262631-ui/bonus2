@@ -223,25 +223,38 @@
     }
 
     function initUI() {
-        const sel = document.getElementById('selEmp');
-        const opt = sel.options[sel.selectedIndex];
-        const isL1 = opt.dataset.rank === 'L1';
-        
-        timelineData = { 
-            Q1:{r:opt.dataset.rank, s:opt.dataset.salary}, 
-            Q2:{r:opt.dataset.rank, s:opt.dataset.salary}, 
-            Q3:{r:opt.dataset.rank, s:opt.dataset.salary}, 
-            Q4:{r:opt.dataset.rank, s:opt.dataset.salary} 
-        };
+    const sel = document.getElementById('selEmp');
+    const opt = sel.options[sel.selectedIndex];
+    
+    // 💡 關鍵修正：確保強制轉成大寫進行比對
+    const rank = (opt.getAttribute('data-rank') || "").toUpperCase();
+    const isL1 = (rank === 'L1');
+    
+    // 更新當前人員的薪資與職等資訊
+    timelineData = { 
+        Q1:{r: rank, s: opt.dataset.salary}, 
+        Q2:{r: rank, s: opt.dataset.salary}, 
+        Q3:{r: rank, s: opt.dataset.salary}, 
+        Q4:{r: rank, s: opt.dataset.salary} 
+    };
 
-        let h1 = '', h2 = '';
-        for(let i=1; i<=(isL1?12:4); i++) h1 += `<div class="input-group"><span class="input-label">${isL1?i+'月':'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
-        for(let i=1; i<=12; i++) h2 += `<div class="input-group"><span class="input-label">${i}月</span><input type="number" class="q-score prj-in" oninput="runLiveCalc()"></div>`;
-        
-        document.getElementById('annualInputs').innerHTML = h1; 
-        document.getElementById('projInputs').innerHTML = h2;
-        autoCalc(true); 
+    let h1 = '', h2 = '';
+    // 💡 根據職等決定生成 12 個月還是 4 季的輸入框
+    const count = isL1 ? 12 : 4;
+    for(let i=1; i<=count; i++) {
+        h1 += `<div class="input-group"><span class="input-label">${isL1 ? i+'月' : 'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
     }
+    
+    for(let i=1; i<=12; i++) {
+        h2 += `<div class="input-group"><span class="input-label">${i}月</span><input type="number" class="q-score prj-in" oninput="runLiveCalc()"></div>`;
+    }
+    
+    document.getElementById('annualInputs').innerHTML = h1; 
+    document.getElementById('projInputs').innerHTML = h2;
+    
+    // 重新載入該員在該年度的歷史儲存資料
+    autoCalc(true); 
+}
 
     function runLiveCalc() {
         const getAvg = (cls) => {
