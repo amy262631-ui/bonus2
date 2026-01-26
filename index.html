@@ -186,19 +186,32 @@
 
     function initUI() {
         const sel = document.getElementById('selEmp');
+        if (!sel.options.length) return; // 防止選單尚未載入
+        
         const opt = sel.options[sel.selectedIndex];
-        const isL1 = opt.dataset.rank === 'L1';
+        
+        // 💡 關鍵修正：確保讀取到正確的職等屬性
+        const rank = (opt.getAttribute('data-rank') || "").toUpperCase();
+        const isL1 = (rank === 'L1');
+        const salary = opt.getAttribute('data-salary') || 0;
         
         timelineData = { 
-            Q1:{r:opt.dataset.rank, s:opt.dataset.salary}, 
-            Q2:{r:opt.dataset.rank, s:opt.dataset.salary}, 
-            Q3:{r:opt.dataset.rank, s:opt.dataset.salary}, 
-            Q4:{r:opt.dataset.rank, s:opt.dataset.salary} 
+            Q1:{r: rank, s: salary}, 
+            Q2:{r: rank, s: salary}, 
+            Q3:{r: rank, s: salary}, 
+            Q4:{r: rank, s: salary} 
         };
 
         let h1 = '', h2 = '';
-        for(let i=1; i<=(isL1?12:4); i++) h1 += `<div class="input-group"><span class="input-label">${isL1?i+'月':'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
-        for(let i=1; i<=12; i++) h2 += `<div class="input-group"><span class="input-label">${i}月</span><input type="number" class="q-score prj-in" oninput="runLiveCalc()"></div>`;
+        // 💡 根據 isL1 決定生成 12 個月還是 4 季
+        const count = isL1 ? 12 : 4;
+        for(let i=1; i<=count; i++) {
+            h1 += `<div class="input-group"><span class="input-label">${isL1 ? i+'月' : 'Q'+i}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
+        }
+        
+        for(let i=1; i<=12; i++) {
+            h2 += `<div class="input-group"><span class="input-label">${i}月</span><input type="number" class="q-score prj-in" oninput="runLiveCalc()"></div>`;
+        }
         
         document.getElementById('annualInputs').innerHTML = h1; 
         document.getElementById('projInputs').innerHTML = h2;
@@ -642,20 +655,31 @@ function renderReportCharts(data) {
     }
 
     // --- 局部新增 1：分頁切換控制 (不影響原本邏輯) ---
-    function switchTab(tab) {
-        // 抓取原本系統中所有的主要大卡片區塊
-        const mainSections = document.querySelectorAll('body > .card, #adminZone');
+   function switchTab(tab) {
+        // 抓取原本系統中所有的主要區塊 (排除頂部控制區)
+        const mainSections = document.querySelectorAll('body > .card, #adminZone, h2');
         const salaryPage = document.getElementById('salaryPage');
 
         if (tab === 'salary') {
-            // 隱藏所有獎金相關內容，顯示薪資頁面
-            mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'none'; });
+            // 隱藏所有獎金相關內容，但保留頂部選擇人員的那個卡片
+            mainSections.forEach(el => {
+                // 如果這個卡片裡面有 #selEmp，就不要隱藏它
+                if (el !== salaryPage && !el.querySelector('#selEmp')) {
+                    el.style.display = 'none';
+                }
+            });
             salaryPage.style.display = 'block';
             loadSalaryHistoryLocal(); 
         } else {
             // 恢復獎金試算 UI
-            mainSections.forEach(el => { if(el.id !== 'salaryPage') el.style.display = 'block'; });
-            // 依照原本的主管授權狀態決定是否顯示核定區
+            mainSections.forEach(el => {
+                if (el !== salaryPage) {
+                    // 恢復 score-container 原始彈性佈局
+                    if(el.classList.contains('score-container')) el.style.display = 'flex';
+                    else el.style.display = 'block';
+                }
+            });
+            // 依照主管授權狀態決定核定區
             const isUnlocked = document.getElementById('unlockBtn').innerText.includes('已授權');
             document.getElementById('adminZone').style.display = isUnlocked ? 'block' : 'none';
             salaryPage.style.display = 'none';
