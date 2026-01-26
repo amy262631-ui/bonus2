@@ -123,9 +123,11 @@
         </div>
         
         <div class="card">
-            <h2>📈 歷年獎金趨勢</h2>
-            <div style="height:350px;"><canvas id="historyCompareChart"></canvas></div>
-        </div>
+    <h2>📈 歷年總獎金成長趨勢 (折線圖)</h2>
+    <div style="height:350px;">
+        <canvas id="historyTrendChart"></canvas> 
+    </div>
+</div>
     </div>
 </div>
 
@@ -421,33 +423,42 @@
     }
 
     function renderTrendChart(labels, data) {
-        const ctx2 = document.getElementById('historyTrendChart').getContext('2d');
-        if(window.historyTrendChartInstance) window.historyTrendChartInstance.destroy();
-        window.historyTrendChartInstance = new Chart(ctx2, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '歷年總獎金成長趨勢',
-                    data: data,
-                    borderColor: '#e74c3c',
-                    borderWidth: 3,
-                    fill: false,
-                    tension: 0.1,
-                    pointRadius: 6,
-                    pointBackgroundColor: '#e74c3c'
-                }]
-            },
-            options: {
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top' },
-                    datalabels: { display: true, align: 'top', formatter: v => v.toLocaleString() }
-                },
-                scales: { y: { beginAtZero: true } }
-            }
-        });
+    const canvas = document.getElementById('historyTrendChart');
+    
+    // 💡 防錯檢查：如果找不到畫布，就先跳出，不要報錯
+    if (!canvas) {
+        console.warn("找不到 ID 為 historyTrendChart 的畫布元素，跳過繪製折線圖。");
+        return; 
     }
+
+    const ctx2 = canvas.getContext('2d');
+    if(window.historyTrendChartInstance) window.historyTrendChartInstance.destroy();
+    
+    window.historyTrendChartInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '歷年總獎金成長趨勢',
+                data: data,
+                borderColor: '#e74c3c',
+                borderWidth: 3,
+                fill: false,
+                tension: 0.1,
+                pointRadius: 6,
+                pointBackgroundColor: '#e74c3c'
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                datalabels: { display: true, align: 'top', formatter: v => v.toLocaleString() }
+            },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
 
     async function askPassword() {
         const pwd = prompt("主管授權密碼");
