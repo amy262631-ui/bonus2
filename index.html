@@ -270,48 +270,64 @@ function initUI() {
     }
 
     async function autoCalc(forceSync = false) {
-        if (isUserTyping && !forceSync) return;
+    if (isUserTyping && !forceSync) return;
 
-        if(forceSync) {
-            document.querySelectorAll('.ann-in, .prj-in').forEach(i => i.value = "");
-            if(document.getElementById('resultBody')) document.getElementById('resultBody').innerHTML = "";
-        }
-
-        const payload = { 
-            action: "calculateBonus", 
-            empName: document.getElementById('selEmp').value, 
-            year: document.getElementById('calcYear').value, 
-            scores: Array.from(document.querySelectorAll('.ann-in')).map(i => i.value||null), 
-            timeline: timelineData, 
-            avgScore: document.getElementById('avgSpan').innerText, 
-            projAvg: document.getElementById('projAvgSpan').innerText 
-        };
-
-        try {
-           const res = await fetch(API_URL, { 
-    method: "POST", 
-    // 不要設定 headers: { 'Content-Type': 'application/json' }
-    // 直接傳送 body，GAS 能透過 e.postData.contents 接收
-    body: JSON.stringify(payload) 
-});
-            
-            if(r.status === "success") {
-                baseResults = r.data;
-                baseResults.yearConfigs = r.yearConfigs; // 💡 接收後端 System_Config
-
-                if(forceSync) {
-                    if(r.historyScores) document.querySelectorAll('.ann-in').forEach((el,i) => el.value = r.historyScores[i] || "");
-                    if(r.historyProjScores) document.querySelectorAll('.prj-in').forEach((el,i) => el.value = r.historyProjScores[i] || "");
-                    if(r.historyTimeline) timelineData = r.historyTimeline;
-                    runLiveCalc(); 
-                }
-                renderTimelineUI();
-                updateAdminTableUI(r.historyAdjs || [0,0,0,0,80000,0]);
-                updateHistoryCharts();
-            }
-        } catch(e) { console.error("AutoCalc Error:", e); }
+    if(forceSync) {
+        document.querySelectorAll('.ann-in, .prj-in').forEach(i => i.value = "");
+        if(document.getElementById('resultBody')) document.getElementById('resultBody').innerHTML = "";
     }
 
+    const payload = { 
+        action: "calculateBonus", 
+        empName: document.getElementById('selEmp').value, 
+        year: document.getElementById('calcYear').value, 
+        scores: Array.from(document.querySelectorAll('.ann-in')).map(i => i.value||null), 
+        timeline: timelineData, 
+        avgScore: document.getElementById('avgSpan').innerText, 
+        projAvg: document.getElementById('projAvgSpan').innerText 
+    };
+
+    try {
+        // 💡 1. 執行連線
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify(payload) 
+        });
+        
+        // 💡 2. 關鍵修正：將原始回應轉換為程式可讀的 JSON 物件 (r 就在這裡定義)
+        const r = await res.json();
+        
+        // 💡 3. 處理後端回傳結果
+        if(r.status === "success") {
+            baseResults = r.data;
+            baseResults.yearConfigs = r.yearConfigs; 
+
+            if(forceSync) {
+                // 如果有歷史分數紀錄，填入輸入框
+                if(r.historyScores) {
+                    document.querySelectorAll('.ann-in').forEach((el,i) => el.value = r.historyScores[i] || "");
+                }
+                if(r.historyProjScores) {
+                    document.querySelectorAll('.prj-in').forEach((el,i) => el.value = r.historyProjScores[i] || "");
+                }
+                // 同步歷史職等/薪資設定
+                if(r.historyTimeline) timelineData = r.historyTimeline;
+                
+                // 重新計算前端數值
+                runLiveCalc(); 
+            }
+            
+            // 更新 UI 介面與圖表
+            renderTimelineUI();
+            updateAdminTableUI(r.historyAdjs || [0,0,0,0,80000,0]);
+            updateHistoryCharts();
+        } else {
+            console.error("後端回傳錯誤:", r.msg);
+        }
+    } catch(e) { 
+        console.error("AutoCalc 連線或解析錯誤:", e); 
+    }
+}
   function updateAdminTableUI(adjs = null) {
     const cfg = baseResults.yearConfigs || {};
     const rb = document.getElementById('resultBody');
