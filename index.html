@@ -279,8 +279,12 @@ function initUI() {
         };
 
         try {
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-            const r = await res.json();
+           const res = await fetch(API_URL, { 
+    method: "POST", 
+    // 不要設定 headers: { 'Content-Type': 'application/json' }
+    // 直接傳送 body，GAS 能透過 e.postData.contents 接收
+    body: JSON.stringify(payload) 
+});
             
             if(r.status === "success") {
                 baseResults = r.data;
