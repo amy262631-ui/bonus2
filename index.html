@@ -89,6 +89,25 @@
         .excel-report th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .chart-box { page-break-inside: avoid; }
     }
+        /* --- 局部新增：列印專用樣式 --- */
+@media print {
+    /* 隱藏所有按鈕、輸入表單和原本的獎金系統 */
+    body * { visibility: hidden; }
+    .no-print, .btn, #salaryAddZone, .header-controls, #adminZone { display: none !important; }
+    
+    /* 確保薪資頁面是可見的，且從紙張頂部開始 */
+    #salaryPage, #salaryPage * { visibility: visible; }
+    #salaryPage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    /* 表格邊框加黑，列印更清晰 */
+    .excel-report td, .excel-report th { border: 1px solid #000 !important; }
+}
 </style>
 </head>
 <body>
@@ -776,38 +795,33 @@ async function loadSalaryHistoryLocal() {
 <div id="salaryPage" style="display:none;" class="card">
     <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--accent); padding-bottom: 15px; margin-bottom: 20px;">
         <h2 style="color:var(--primary); margin: 0;">💵 薪資變動歷史 - <span id="salaryTargetName"></span></h2>
-        <button class="btn" style="background:#7f8c8d;" onclick="switchTab('main')">⬅️ 返回獎金試算</button>
+        <div class="no-print" style="display: flex; gap: 10px;">
+            <button class="btn" style="background:#34495e;" onclick="printSalary('single')">🖨️ 列印個人</button>
+            <button class="btn" style="background:#2c3e50;" onclick="printSalary('all')">🖨️ 列印全體</button>
+            <button class="btn" style="background:#7f8c8d;" onclick="switchTab('main')">⬅️ 返回</button>
+        </div>
     </div>
 
     <div id="salaryAddZone" style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:20px; border:1px solid #ddd;" class="no-print">
-        <h3 style="margin-top:0; color:var(--primary); font-size: 1.2rem;">➕ 新增薪資變動紀錄</h3>
+        <h3 style="margin:0 0 10px 0; font-size: 1.1rem;">➕ 新增調薪紀錄</h3>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
             <div class="input-group">
-                <span class="input-label" style="font-size:0.9rem;">生效日期</span>
-                <input type="date" id="newSalaryDate" style="padding:10px; border-radius:8px; border:1px solid #ccc;">
+                <span style="font-size:0.8rem;">生效日期</span>
+                <input type="date" id="newSalaryDate" style="padding:8px; border-radius:5px; border:1px solid #ccc;">
             </div>
             <div class="input-group">
-                <span class="input-label" style="font-size:0.9rem;">薪資金額</span>
-                <input type="number" id="newSalaryAmount" placeholder="32000" style="padding:10px; border-radius:8px; border:1px solid #ccc; width:130px;">
+                <span style="font-size:0.8rem;">薪資金額</span>
+                <input type="number" id="newSalaryAmount" placeholder="金額" style="padding:8px; width:100px; border-radius:5px; border:1px solid #ccc;">
             </div>
             <div class="input-group">
-                <span class="input-label" style="font-size:0.9rem;">職等</span>
-                <select id="newSalaryRank" style="padding:10px; border-radius:8px; border:1px solid #ccc;">
-                    <option value="L1">L1</option>
-                    <option value="L2">L2</option>
-                    <option value="L3">L3</option>
-                    <option value="L4">L4</option>
+                <span style="font-size:0.8rem;">職等</span>
+                <select id="newSalaryRank" style="padding:8px; border-radius:5px; border:1px solid #ccc;">
+                    <option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option><option value="L4">L4</option>
                 </select>
             </div>
-            <div class="input-group">
-                <span class="input-label" style="font-size:0.9rem;">變動類別</span>
-                <input type="text" id="newSalaryType" placeholder="調薪/晉升" style="padding:10px; border-radius:8px; border:1px solid #ccc; width:120px;">
-            </div>
-            <div class="input-group" style="flex-grow:1;">
-                <span class="input-label" style="font-size:0.9rem;">決策備註</span>
-                <input type="text" id="newSalaryNote" placeholder="備註..." style="padding:10px; border-radius:8px; border:1px solid #ccc; width:100%;">
-            </div>
-            <button class="btn" style="background:var(--success); padding: 10px 20px;" onclick="submitNewSalary()">確認新增</button>
+            <input type="text" id="newSalaryType" placeholder="類別(如:晉升)" style="padding:8px; width:100px; border-radius:5px; border:1px solid #ccc;">
+            <input type="text" id="newSalaryNote" placeholder="決策備註" style="padding:8px; flex-grow:1; border-radius:5px; border:1px solid #ccc;">
+            <button class="btn" style="background:var(--success);" onclick="submitNewSalary()">新增</button>
         </div>
     </div>
     
@@ -815,11 +829,11 @@ async function loadSalaryHistoryLocal() {
         <table class="excel-report" style="width:100%; border-collapse: collapse;">
             <thead>
                 <tr style="background:#f4f4f4;">
+                    <th id="thNameCol" style="display:none; width:100px;">姓名</th>
                     <th style="width:150px;">薪資金額</th>
                     <th style="width:100px;">調幅 %</th>
                     <th style="width:150px;">生效日期</th>
                     <th style="width:100px;">職等</th>
-                    <th style="width:120px;">變動類別</th>
                     <th>決策備註</th>
                 </tr>
             </thead>
