@@ -196,14 +196,23 @@
     let scoreChart=null, historyCompareChart=null, timelineData={}, baseResults={};
     let isUserTyping = false; Chart.register(ChartDataLabels);
 
-    window.onload = async () => {
-        const res = await fetch(API_URL);
+   window.onload = async () => {
+    try {
+        const res = await fetch(API_URL); // 不需要傳入 init 物件，預設就是 GET
         const r = await res.json();
-        document.getElementById('selEmp').innerHTML = r.data.map(e => 
-    `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`
-).join('');
-        initUI();
-    };
+        
+        if (r.status === "success") {
+            document.getElementById('selEmp').innerHTML = r.data.map(e => 
+                `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`
+            ).join('');
+            initUI();
+        } else {
+            console.error("後端回傳錯誤:", r.msg);
+        }
+    } catch (e) {
+        console.error("初始化載入失敗 (CORS 或 網路問題):", e);
+    }
+};
 
 function initUI() {
     const sel = document.getElementById('selEmp');
