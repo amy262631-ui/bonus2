@@ -523,6 +523,7 @@ const calcRef = (q, idx) => {
     }
 
 // --- 1. 主管授權與驗證 ---
+   // --- 1. 主管授權與驗證 ---
     async function askPassword() {
         const pwd = prompt("主管授權密碼");
         if (!pwd) return;
@@ -536,7 +537,10 @@ const calcRef = (q, idx) => {
             } else {
                 alert("密碼錯誤");
             }
-        } catch(e) { alert("驗證失敗，請檢查網路"); }
+        } catch(e) { 
+            console.error("驗證出錯:", e);
+            alert("驗證失敗，請檢查網路"); 
+        }
     }
 
     function refreshTotal() {
@@ -587,9 +591,9 @@ const calcRef = (q, idx) => {
                                 ${grouped[year].map(h => `
                                     <tr>
                                         <td>${h.empName}</td>
-                                        <td>${h.f1.toLocaleString()}</td><td>${h.f2.toLocaleString()}</td><td>${h.f3.toLocaleString()}</td>
-                                        <td>${h.ye.toLocaleString()}</td><td>${h.proj.toLocaleString()}</td>
-                                        <td style="font-weight:bold;">${h.total.toLocaleString()}</td>
+                                        <td>${(h.f1||0).toLocaleString()}</td><td>${(h.f2||0).toLocaleString()}</td><td>${(h.f3||0).toLocaleString()}</td>
+                                        <td>${(h.ye||0).toLocaleString()}</td><td>${(h.proj||0).toLocaleString()}</td>
+                                        <td style="font-weight:bold;">${(h.total||0).toLocaleString()}</td>
                                         <td></td>
                                     </tr>
                                 `).join('')}
@@ -616,9 +620,9 @@ const calcRef = (q, idx) => {
                             ${r.history.sort((a,b)=>a.year-b.year).map(h => `
                                 <tr>
                                     <td style="text-align:center;">${h.year}</td>
-                                    <td>${h.f1.toLocaleString()}</td><td>${h.f2.toLocaleString()}</td><td>${h.f3.toLocaleString()}</td>
-                                    <td>${h.ye.toLocaleString()}</td><td>${h.proj.toLocaleString()}</td>
-                                    <td style="font-weight:bold;">${h.total.toLocaleString()}</td>
+                                    <td>${(h.f1||0).toLocaleString()}</td><td>${(h.f2||0).toLocaleString()}</td><td>${(h.f3||0).toLocaleString()}</td>
+                                    <td>${(h.ye||0).toLocaleString()}</td><td>${(h.proj||0).toLocaleString()}</td>
+                                    <td style="font-weight:bold;">${(h.total||0).toLocaleString()}</td>
                                     <td></td>
                                 </tr>
                             `).join('')}
@@ -633,13 +637,17 @@ const calcRef = (q, idx) => {
                 setTimeout(() => { renderReportCharts(r.history); }, 500);
             }
             document.getElementById('reportModal').style.display = 'block';
-        } catch (err) { alert("無法生成報表"); }
+        } catch (err) { 
+            console.error("報表生成錯誤:", err);
+            alert("無法生成報表"); 
+        }
     }
 
     function renderReportCharts(data) {
         const ctxBar = document.getElementById('printBarChart')?.getContext('2d');
         const ctxLine = document.getElementById('printLineChart')?.getContext('2d');
         if (!ctxBar || !ctxLine) return;
+
         const sortedData = data.sort((a,b) => a.year - b.year);
         const labels = sortedData.map(d => d.year + "年");
 
@@ -648,21 +656,21 @@ const calcRef = (q, idx) => {
             data: {
                 labels: labels,
                 datasets: [
-                    { label: '三節', data: sortedData.map(d => d.f1 + d.f2 + d.f3), backgroundColor: '#3498db' },
-                    { label: '年終', data: sortedData.map(d => d.ye), backgroundColor: '#27ae60' },
-                    { label: '專案', data: sortedData.map(d => d.proj), backgroundColor: '#e67e22' }
+                    { label: '三節', data: sortedData.map(d => (d.f1||0) + (d.f2||0) + (d.f3||0)), backgroundColor: '#3498db' },
+                    { label: '年終', data: sortedData.map(d => (d.ye||0)), backgroundColor: '#27ae60' },
+                    { label: '專案', data: sortedData.map(d => (d.proj||0)), backgroundColor: '#e67e22' }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { display: true, formatter: v => v.toLocaleString() } } }
+            options: { responsive: true, maintainAspectRatio: false }
         });
 
         new Chart(ctxLine, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [{ label: '總獎金趨勢', data: sortedData.map(d => d.total), borderColor: '#e74c3c', fill: false }]
+                datasets: [{ label: '總獎金趨勢', data: sortedData.map(d => (d.total||0)), borderColor: '#e74c3c', fill: false }]
             },
-            options: { responsive: true, maintainAspectRatio: false, layout: { padding: { right: 60 } } }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 
@@ -670,7 +678,8 @@ const calcRef = (q, idx) => {
     async function handleFinalSave() {
         const getNumFromLabel = (id) => {
             const el = document.getElementById(id);
-            return el ? (parseFloat(el.innerText.replace(/[^0-9.-]+/g, "")) || 0) : 0;
+            if(!el) return 0;
+            return parseFloat(el.innerText.replace(/[^0-9.-]+/g, "")) || 0;
         };
         const refF1 = getNumFromLabel('ref_f1');
         const refF2 = getNumFromLabel('ref_f2');
@@ -686,11 +695,11 @@ const calcRef = (q, idx) => {
             avgScore: document.getElementById('avgSpan').innerText, 
             f1_base: refF1, f2_base: refF2, f3_base: refF3, ye_base: refYe, 
             proj_final_base: document.getElementById('adj_proj_base').value, 
-            f1_adj: parseFloat(document.getElementById('target_f1').value) - refF1, 
-            f2_adj: parseFloat(document.getElementById('target_f2').value) - refF2, 
-            f3_adj: parseFloat(document.getElementById('target_f3').value) - refF3, 
-            ye_adj: parseFloat(document.getElementById('target_ye').value) - refYe, 
-            proj_adj: parseFloat(document.getElementById('target_proj').value) - refProj, 
+            f1_adj: (parseFloat(document.getElementById('target_f1').value)||0) - refF1, 
+            f2_adj: (parseFloat(document.getElementById('target_f2').value)||0) - refF2, 
+            f3_adj: (parseFloat(document.getElementById('target_f3').value)||0) - refF3, 
+            ye_adj: (parseFloat(document.getElementById('target_ye').value)||0) - refYe, 
+            proj_adj: (parseFloat(document.getElementById('target_proj').value)||0) - refProj, 
             total: document.getElementById('totalCell').innerText.replace(/,/g,''), 
             timeline: timelineData, 
             scores: Array.from(document.querySelectorAll('.ann-in')).map(i=>i.value), 
@@ -700,19 +709,23 @@ const calcRef = (q, idx) => {
         try {
             await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
             alert("✅ 儲存成功！歷史發放金額已鎖定。");
-            updateHistoryCharts();
-        } catch (err) { alert("❌ 儲存失敗"); }
+            if (typeof updateHistoryCharts === "function") updateHistoryCharts();
+        } catch (err) { 
+            console.error("儲存出錯:", err);
+            alert("❌ 儲存失敗"); 
+        }
     }
 
     function downloadChart(chartId, bName) {
         const canvas = document.getElementById(chartId);
+        if(!canvas) return;
         const link = document.createElement('a');
         link.href = canvas.toDataURL('image/jpeg', 0.9);
         link.download = `${document.getElementById('selEmp').value}_${bName}.jpg`;
         link.click();
     }
 
-    // --- 4. 薪資管理與分頁 (整合最新邏輯) ---
+    // --- 4. 薪資管理與分頁控制 ---
     function switchTab(tab) {
         const mainSections = document.querySelectorAll('body > .card, #adminZone, .score-container');
         const salaryPage = document.getElementById('salaryPage');
@@ -723,19 +736,21 @@ const calcRef = (q, idx) => {
         } else {
             mainSections.forEach(el => el.style.display = 'block');
             salaryPage.style.display = 'none';
-            initUI();
+            if (typeof initUI === "function") initUI();
         }
     }
 
     async function loadSalaryHistoryLocal() {
         const name = document.getElementById('selEmp').value;
-        document.getElementById('salaryTargetName').innerText = name;
+        const targetName = document.getElementById('salaryTargetName');
+        if(targetName) targetName.innerText = name;
         const body = document.getElementById('salaryBody');
+        if(!body) return;
         body.innerHTML = '<tr><td colspan="6" style="text-align:center;">🔍 載入中...</td></tr>';
         try {
             const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
             const r = await res.json();
-            if (r.status === "success" && r.history.length > 0) {
+            if (r.status === "success" && r.history && r.history.length > 0) {
                 let sorted = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
                 let html = sorted.map((h, i) => {
                     let diff = i > 0 ? ((h.amount - sorted[i-1].amount) / sorted[i-1].amount * 100).toFixed(1) + '%' : '-';
@@ -750,7 +765,10 @@ const calcRef = (q, idx) => {
                 }).reverse().join('');
                 body.innerHTML = html;
             } else { body.innerHTML = '<tr><td colspan="6" style="text-align:center;">暫無紀錄</td></tr>'; }
-        } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">連線失敗</td></tr>'; }
+        } catch (e) { 
+            console.error("載入薪資紀錄失敗:", e);
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">連線失敗</td></tr>'; 
+        }
     }
 
     async function submitNewSalary() {
@@ -767,7 +785,10 @@ const calcRef = (q, idx) => {
         try {
             const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
             const r = await res.json();
-            if(r.status === "success") { alert("✅ 新增成功！"); loadSalaryHistoryLocal(); }
+            if(r.status === "success") { 
+                alert("✅ 新增成功！"); 
+                loadSalaryHistoryLocal(); 
+            }
         } catch(e) { alert("❌ 新增失敗"); }
     }
 
@@ -775,8 +796,8 @@ const calcRef = (q, idx) => {
         const nameSpan = document.getElementById('salaryTargetName');
         const nameCol = document.getElementById('thNameCol');
         if (mode === 'all') {
-            nameSpan.innerText = "全體人員薪資清冊";
-            if (nameCol) nameCol.style.display = 'table-cell';
+            if(nameSpan) nameSpan.innerText = "全體人員薪資清冊";
+            if(nameCol) nameCol.style.display = 'table-cell';
             const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getAllSalaryHistory" }) });
             const r = await res.json();
             if(r.status === "success") {
