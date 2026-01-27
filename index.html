@@ -602,6 +602,63 @@
             body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">連線失敗</td></tr>';
         }
     }
+    // --- 1. 修正分頁切換功能 (解決 switchTab is not defined) ---
+function switchTab(tab) {
+    const mainSections = document.querySelectorAll('body > .card, #adminZone');
+    const salaryPage = document.getElementById('salaryPage');
+    
+    if (tab === 'salary') {
+        // 切換到薪資紀錄頁面
+        mainSections.forEach(el => el.style.display = 'none');
+        salaryPage.style.display = 'block';
+        loadSalaryHistoryLocal(); // 載入薪資歷史
+    } else {
+        // 切換回獎金試算主頁面
+        mainSections.forEach(el => el.style.display = 'block');
+        salaryPage.style.display = 'none';
+        initUI(); // 重新載入試算介面
+    }
+}
+
+// --- 2. 修正趨勢圖渲染功能 (解決 renderTrendChart is not defined) ---
+function renderTrendChart(labels, data) {
+    const ctx2 = document.getElementById('historyTrendChart').getContext('2d');
+    
+    // 如果已經有圖表實例，先銷毀它再重新繪製
+    if(window.historyTrendChartInstance) window.historyTrendChartInstance.destroy();
+    
+    window.historyTrendChartInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '歷年總獎金成長趨勢',
+                data: data,
+                borderColor: '#e74c3c',
+                borderWidth: 3,
+                fill: false,
+                tension: 0.1,
+                pointRadius: 6,
+                pointBackgroundColor: '#e74c3c'
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'top' },
+                datalabels: { 
+                    display: true, 
+                    align: 'top', 
+                    formatter: v => v > 0 ? v.toLocaleString() : '',
+                    font: { weight: 'bold' }
+                }
+            },
+            scales: { 
+                y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } 
+            }
+        }
+    });
+}
 </script>
 </body>
 </html>
