@@ -252,169 +252,147 @@
         document.getElementById('totalCell').innerText = t.toLocaleString();
     }
 
-    async function askPassword() {
+  async function askPassword() {
         const pwd = prompt("主管授權密碼");
-        if(!pwd) return;
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "verifyAdmin", password: pwd }) });
-        const r = await res.json();
-        if(r.status === "success") {
-            document.getElementById('adminZone').style.display = 'block';
-            document.getElementById('unlockBtn').innerText = "🔓 已授權";
-        } else alert("密碼錯誤");
+        if (!pwd) return;
+        try {
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "verifyAdmin", password: pwd }) });
+            const r = await res.json();
+            if(r.status === "success") { 
+                document.getElementById('adminZone').style.display = 'block'; 
+                document.getElementById('unlockBtn').innerText = "🔓 已授權"; 
+                autoCalc(false); 
+            } else {
+                alert("密碼錯誤");
+            }
+        } catch(e) { 
+            console.error("驗證失敗:", e);
+            alert("連線失敗"); 
+        }
     }
 
-  async function updateHistoryCharts() {
-    try {
-        const res = await fetch(API_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ action: "getHistoryComparison", empName: document.getElementById('selEmp').value }) 
+    function refreshTotal() {
+        let t = 0; 
+        ['target_f1','target_f2','target_f3','target_ye','target_proj'].forEach(id => { 
+            const el = document.getElementById(id); 
+            if(el) t += parseFloat(el.value) || 0; 
         });
-        const r = await res.json();
+        document.getElementById('totalCell').innerText = t.toLocaleString();
+    }
+
+    // --- 2. 報表生成 (按人員分組 + 年份由舊到新) ---
+    async function openReport(mode) {
+        const inner = document.getElementById('reportInner');
+        const name = document.getElementById('selEmp').value;
+        const payload = mode === 'all' ? { action: "getHistoryComparison" } : { action: "getHistoryComparison", empName: name };
         
-        if(r.status === "success" && r.history.length > 0) {
-            // 💡 修正 1：確保年份排序正確 (由小到大 2023 -> 2024 -> 2025)
-            const sortedHistory = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
-            const labels = sortedHistory.map(d => d.year + '年');
+        try {
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+            const r = await res.json();
             
-            // --- 渲染歷年獎金對比 (多色堆疊長條圖) ---
-            const ctx1 = document.getElementById('historyCompareChart').getContext('2d');
-            if(window.historyCompareChartInstance) window.historyCompareChartInstance.destroy();
-            window.historyCompareChartInstance = new Chart(ctx1, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: '五一', data: sortedHistory.map(d => Number(d.f1 || 0)), backgroundColor: '#3498db' },
-                        { label: '端午', data: sortedHistory.map(d => Number(d.f2 || 0)), backgroundColor: '#2980b9' },
-                        { label: '中秋', data: sortedHistory.map(d => Number(d.f3 || 0)), backgroundColor: '#1f618d' },
-                        { label: '年終', data: sortedHistory.map(d => Number(d.ye || 0)), backgroundColor: '#27ae60' },
-                        { label: '專案', data: sortedHistory.map(d => Number(d.proj || 0)), backgroundColor: '#e67e22' }
-                    ]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' },
-                        datalabels: {
-                            display: true,
-                            anchor: 'end',
-                            align: 'top',
-                            // 只顯示總計標籤在最上方
-                            formatter: (v, ctx) => {
-                                if (ctx.datasetIndex === ctx.chart.data.datasets.length - 1) {
-                                    let total = 0;
-                                    for(let i=0; i<ctx.chart.data.datasets.length; i++) {
-                                        total += Number(ctx.chart.data.datasets[i].data[ctx.dataIndex] || 0);
-                                    }
-                                    return total.toLocaleString();
-                                }
-                                return null;
-                            },
-                            font: { weight: 'bold' }
-                        }
+            if (mode === 'all') {
+                const sortedData = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                const groupedByPerson = sortedData.reduce((acc, curr) => {
+                    if (!acc[curr.empName]) acc[curr.empName] = [];
+                    acc[curr.empName].push(curr);
+                    return acc;
+                }, {});
+
+                const people = Object.keys(groupedByPerson).sort();
+                inner.innerHTML = people.map(pName => `
+                    <div class="report-page" style="page-break-after: always; margin-bottom: 40px;">
+                        <h2 style="text-align:center;">員工歷年獎金明細表 - ${pName}</h2>
+                        <table class="excel-report">
+                            <thead>
+                                <tr><th>年度</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計</th></tr>
+                            </thead>
+                            <tbody>
+                                ${groupedByPerson[pName].map(h => `
+                                    <tr>
+                                        <td style="text-align:center;">${h.year}</td>
+                                        <td>${(h.f1||0).toLocaleString()}</td><td>${(h.f2||0).toLocaleString()}</td>
+                                        <td>${(h.f3||0).toLocaleString()}</td><td>${(h.ye||0).toLocaleString()}</td>
+                                        <td>${(h.proj||0).toLocaleString()}</td>
+                                        <td style="font-weight:bold;">${(h.total||0).toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `).join('');
+            } else {
+                // 個人報表略...
+            }
+            document.getElementById('reportModal').style.display = 'block';
+        } catch (err) { alert("報表生成失敗"); }
+    }
+
+    // --- 3. 歷年圖表更新 (修正顏色、排序、xy標籤) ---
+    async function updateHistoryCharts() {
+        try {
+            const res = await fetch(API_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ action: "getHistoryComparison", empName: document.getElementById('selEmp').value }) 
+            });
+            const r = await res.json();
+            if(r.status === "success" && r.history.length > 0) {
+                const sortedHistory = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                const labels = sortedHistory.map(d => d.year + '年');
+                
+                const ctx1 = document.getElementById('historyCompareChart').getContext('2d');
+                if(window.historyCompareChartInstance) window.historyCompareChartInstance.destroy();
+                window.historyCompareChartInstance = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: '五一', data: sortedHistory.map(d => Number(d.f1 || 0)), backgroundColor: '#3498db' },
+                            { label: '端午', data: sortedHistory.map(d => Number(d.f2 || 0)), backgroundColor: '#2980b9' },
+                            { label: '中秋', data: sortedHistory.map(d => Number(d.f3 || 0)), backgroundColor: '#1f618d' },
+                            { label: '年終', data: sortedHistory.map(d => Number(d.ye || 0)), backgroundColor: '#27ae60' },
+                            { label: '專案', data: sortedHistory.map(d => Number(d.proj || 0)), backgroundColor: '#e67e22' }
+                        ]
                     },
-                    scales: { 
-                        x: { stacked: true }, 
-                        y: { stacked: true, beginAtZero: true } 
+                    options: {
+                        maintainAspectRatio: false,
+                        scales: { x: { stacked: true }, y: { stacked: true } },
+                        plugins: { datalabels: { display: true, align: 'top', formatter: (v, ctx) => ctx.datasetIndex === 4 ? sortedHistory[ctx.dataIndex].total.toLocaleString() : null }}
                     }
-                }
-            });
-
-            // --- 修正 2：重新呼叫趨勢折線圖函式 (確保底部圖表出現) ---
-            renderTrendChart(labels, sortedHistory.map(d => Number(d.total || 0)));
-        }
-    } catch (e) {
-        console.error("更新歷史圖表失敗:", e);
-    }
-}
-    function renderTrendChart(labels, data) {
-    const ctx2 = document.getElementById('historyTrendChart').getContext('2d');
-    if(window.historyTrendChartInstance) window.historyTrendChartInstance.destroy();
-    window.historyTrendChartInstance = new Chart(ctx2, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: '歷年總獎金成長趨勢',
-                data: data,
-                borderColor: '#e74c3c',
-                borderWidth: 3,
-                fill: false,
-                tension: 0.1,
-                pointRadius: 6,
-                pointBackgroundColor: '#e74c3c'
-            }]
-        },
-        options: {
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'top' },
-                datalabels: { display: true, align: 'top', formatter: v => v.toLocaleString() }
-            },
-            scales: { y: { beginAtZero: true } }
-        }
-    });
-}
-    function switchTab(tab) {
-        const main = document.querySelectorAll('body > .card, #adminZone');
-        const salary = document.getElementById('salaryPage');
-        if (tab === 'salary') {
-            main.forEach(el => el.style.display = 'none');
-            salary.style.display = 'block';
-            loadSalaryHistoryLocal();
-        } else {
-            main.forEach(el => el.style.display = 'block');
-            salary.style.display = 'none';
-            initUI();
-        }
+                });
+                renderTrendChart(labels, sortedHistory.map(d => Number(d.total || 0)));
+            }
+        } catch (e) { console.error("圖表更新失敗", e); }
     }
 
-  async function loadSalaryHistoryLocal() {
-    const name = document.getElementById('selEmp').value;
-    const targetName = document.getElementById('salaryTargetName');
-    if(targetName) targetName.innerText = name;
-    const body = document.getElementById('salaryBody');
-    if(!body) return;
-    
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;">🔍 資料載入中...</td></tr>';
-    try {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
-        const r = await res.json();
-        
-        if (r.status === "success" && r.history && r.history.length > 0) {
-            // 💡 關鍵：先按日期「由舊到新」排序來計算百分比
-            let sortedOldToNew = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
-            
-            let historyWithPercent = sortedOldToNew.map((h, i) => {
-                let diffText = "-";
-                if (i > 0) {
-                    const prevAmount = sortedOldToNew[i-1].amount;
-                    if (prevAmount > 0) {
-                        const diff = ((h.amount - prevAmount) / prevAmount) * 100;
-                        diffText = diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`;
+    // --- 4. 薪資變動歷史 (修正調幅百分比) ---
+    async function loadSalaryHistoryLocal() {
+        const name = document.getElementById('selEmp').value;
+        const body = document.getElementById('salaryBody');
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;">🔍 載入中...</td></tr>';
+        try {
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
+            const r = await res.json();
+            if (r.status === "success" && r.history.length > 0) {
+                let sorted = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+                let html = sorted.map((h, i) => {
+                    let diff = "-";
+                    if (i > 0 && sorted[i-1].amount > 0) {
+                        const d = ((h.amount - sorted[i-1].amount) / sorted[i-1].amount * 100);
+                        diff = (d > 0 ? "+" : "") + d.toFixed(1) + "%";
                     }
-                }
-                return { ...h, percent: diffText };
-            });
-
-            // 💡 顯示時「由新到舊」排列（最新的在上面）
-            body.innerHTML = historyWithPercent.reverse().map(h => `
-                <tr>
-                    <td style="font-weight:bold; color:var(--success); text-align:right;">$${Number(h.amount).toLocaleString()}</td>
-                    <td style="text-align:center; color: #d35400; font-weight: bold;">${h.percent}</td>
-                    <td style="text-align:center;">${h.date}</td>
-                    <td style="text-align:center;">${h.rank}</td>
-                    <td style="text-align:center;">${h.type || '-'}</td>
-                    <td>${h.note || '-'}</td>
-                </tr>
-            `).join('');
-        } else {
-            body.innerHTML = '<tr><td colspan="6" style="text-align:center;">暫無紀錄</td></tr>';
-        }
-    } catch (e) {
-        body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">連線失敗</td></tr>';
+                    return `<tr>
+                        <td style="font-weight:bold; color:var(--success); text-align:right;">$${Number(h.amount).toLocaleString()}</td>
+                        <td style="text-align:center; color:#d35400; font-weight:bold;">${diff}</td>
+                        <td style="text-align:center;">${h.date}</td>
+                        <td style="text-align:center;">${h.rank}</td>
+                        <td style="text-align:center;">${h.type || '-'}</td>
+                        <td>${h.note || '-'}</td>
+                    </tr>`;
+                }).reverse().join('');
+                body.innerHTML = html;
+            } else { body.innerHTML = '<tr><td colspan="6" style="text-align:center;">暫無紀錄</td></tr>'; }
+        } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">連線失敗</td></tr>'; }
     }
-}
 
     async function submitNewSalary() {
         const data = {
