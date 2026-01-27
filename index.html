@@ -364,35 +364,57 @@
         } catch (e) { console.error("圖表更新失敗", e); }
     }
 
-    // --- 4. 薪資變動歷史 (修正調幅百分比) ---
-    async function loadSalaryHistoryLocal() {
-        const name = document.getElementById('selEmp').value;
-        const body = document.getElementById('salaryBody');
-        body.innerHTML = '<tr><td colspan="6" style="text-align:center;">🔍 載入中...</td></tr>';
-        try {
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
-            const r = await res.json();
-            if (r.status === "success" && r.history.length > 0) {
-                let sorted = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
-                let html = sorted.map((h, i) => {
-                    let diff = "-";
-                    if (i > 0 && sorted[i-1].amount > 0) {
-                        const d = ((h.amount - sorted[i-1].amount) / sorted[i-1].amount * 100);
-                        diff = (d > 0 ? "+" : "") + d.toFixed(1) + "%";
+ async function loadSalaryHistoryLocal() {
+    const name = document.getElementById('selEmp').value;
+    const targetName = document.getElementById('salaryTargetName');
+    if(targetName) targetName.innerText = name;
+    const body = document.getElementById('salaryBody');
+    if(!body) return;
+    
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;">🔍 資料載入中...</td></tr>';
+    try {
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
+        });
+        const r = await res.json();
+        
+        if (r.status === "success" && r.history && r.history.length > 0) {
+            // 💡 1. 先按日期「由舊到新」排序 (2022 -> 2023 -> 2024 -> 2025)
+            let sortedOldToNew = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            // 💡 2. 計算調薪百分比
+            let historyWithPercent = sortedOldToNew.map((h, i) => {
+                let diffText = "-";
+                if (i > 0) {
+                    const prevAmount = sortedOldToNew[i-1].amount;
+                    if (prevAmount > 0) {
+                        const diff = ((h.amount - prevAmount) / prevAmount) * 100;
+                        diffText = (diff > 0 ? "+" : "") + diff.toFixed(1) + "%";
                     }
-                    return `<tr>
-                        <td style="font-weight:bold; color:var(--success); text-align:right;">$${Number(h.amount).toLocaleString()}</td>
-                        <td style="text-align:center; color:#d35400; font-weight:bold;">${diff}</td>
-                        <td style="text-align:center;">${h.date}</td>
-                        <td style="text-align:center;">${h.rank}</td>
-                        <td style="text-align:center;">${h.type || '-'}</td>
-                        <td>${h.note || '-'}</td>
-                    </tr>`;
-                }).reverse().join('');
-                body.innerHTML = html;
-            } else { body.innerHTML = '<tr><td colspan="6" style="text-align:center;">暫無紀錄</td></tr>'; }
-        } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">連線失敗</td></tr>'; }
+                }
+                return { ...h, percent: diffText };
+            });
+
+            // 💡 3. 關鍵修正：直接 map 輸出 (不再使用 reverse)，這樣最早的資料就會在最上面
+            body.innerHTML = historyWithPercent.map(h => `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="font-weight:bold; color:var(--success); text-align:right; padding:15px;">$${Number(h.amount).toLocaleString()}</td>
+                    <td style="text-align:center; color: #d35400; font-weight: bold; padding:15px;">${h.percent}</td>
+                    <td style="text-align:center; padding:15px;">${h.date}</td>
+                    <td style="text-align:center; padding:15px;">${h.rank}</td>
+                    <td style="text-align:center; padding:15px;">${h.type || '-'}</td>
+                    <td style="text-align:left; padding:15px;">${h.note || '-'}</td>
+                </tr>
+            `).join('');
+        } else {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px;">查無調薪紀錄</td></tr>';
+        }
+    } catch (e) {
+        console.error("載入失敗:", e);
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:red;">❌ 連線失敗，請檢查 API。</td></tr>';
     }
+}
 
     async function submitNewSalary() {
         const data = {
