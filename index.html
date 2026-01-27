@@ -778,6 +778,38 @@ async function loadSalaryHistoryLocal() {
         <h2 style="color:var(--primary); margin: 0;">💵 薪資變動歷史 - <span id="salaryTargetName"></span></h2>
         <button class="btn" style="background:#7f8c8d;" onclick="switchTab('main')">⬅️ 返回獎金試算</button>
     </div>
+
+    <div id="salaryAddZone" style="background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:20px; border:1px solid #ddd;" class="no-print">
+        <h3 style="margin-top:0; color:var(--primary); font-size: 1.2rem;">➕ 新增薪資變動紀錄</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+            <div class="input-group">
+                <span class="input-label" style="font-size:0.9rem;">生效日期</span>
+                <input type="date" id="newSalaryDate" style="padding:10px; border-radius:8px; border:1px solid #ccc;">
+            </div>
+            <div class="input-group">
+                <span class="input-label" style="font-size:0.9rem;">薪資金額</span>
+                <input type="number" id="newSalaryAmount" placeholder="32000" style="padding:10px; border-radius:8px; border:1px solid #ccc; width:130px;">
+            </div>
+            <div class="input-group">
+                <span class="input-label" style="font-size:0.9rem;">職等</span>
+                <select id="newSalaryRank" style="padding:10px; border-radius:8px; border:1px solid #ccc;">
+                    <option value="L1">L1</option>
+                    <option value="L2">L2</option>
+                    <option value="L3">L3</option>
+                    <option value="L4">L4</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <span class="input-label" style="font-size:0.9rem;">變動類別</span>
+                <input type="text" id="newSalaryType" placeholder="調薪/晉升" style="padding:10px; border-radius:8px; border:1px solid #ccc; width:120px;">
+            </div>
+            <div class="input-group" style="flex-grow:1;">
+                <span class="input-label" style="font-size:0.9rem;">決策備註</span>
+                <input type="text" id="newSalaryNote" placeholder="備註..." style="padding:10px; border-radius:8px; border:1px solid #ccc; width:100%;">
+            </div>
+            <button class="btn" style="background:var(--success); padding: 10px 20px;" onclick="submitNewSalary()">確認新增</button>
+        </div>
+    </div>
     
     <div style="overflow-x: auto;">
         <table class="excel-report" style="width:100%; border-collapse: collapse;">
