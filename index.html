@@ -471,90 +471,137 @@
         }
     });
 }
-async function openReport(mode) {
-    const inner = document.getElementById('reportInner');
-    const name = document.getElementById('selEmp').value;
-    const payload = mode === 'all' ? { action: "getHistoryComparison" } : { action: "getHistoryComparison", empName: name };
-    
-    try {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-        const r = await res.json();
+// --- 2. 報表生成 (按人員分組 + 年份由舊到新) ---
+    async function openReport(mode) {
+        const inner = document.getElementById('reportInner');
+        const name = document.getElementById('selEmp').value;
+        const payload = mode === 'all' ? { action: "getHistoryComparison" } : { action: "getHistoryComparison", empName: name };
         
-        if (mode === 'all') {
-            // --- 全體模式：按人員分組，年份由舊到新 ---
-            const sortedData = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
-            const groupedByPerson = sortedData.reduce((acc, curr) => {
-                if (!acc[curr.empName]) acc[curr.empName] = [];
-                acc[curr.empName].push(curr);
-                return acc;
-            }, {});
+        try {
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+            const r = await res.json();
+            
+            if (mode === 'all') {
+                // --- 全體模式：按人員分組，年份由舊到新 (2023 -> 2025) ---
+                const sortedData = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                const groupedByPerson = sortedData.reduce((acc, curr) => {
+                    if (!acc[curr.empName]) acc[curr.empName] = [];
+                    acc[curr.empName].push(curr);
+                    return acc;
+                }, {});
 
-            const people = Object.keys(groupedByPerson).sort();
-            inner.innerHTML = people.map(pName => `
-                <div class="report-page" style="page-break-after: always; margin-bottom: 40px;">
-                    <h2 style="text-align:center;">員工歷年獎金明細表 - ${pName}</h2>
+                const people = Object.keys(groupedByPerson).sort();
+                inner.innerHTML = people.map(pName => `
+                    <div class="report-page" style="page-break-after: always; margin-bottom: 40px;">
+                        <h2 style="text-align:center;">員工歷年獎金明細表 - ${pName}</h2>
+                        <table class="excel-report">
+                            <thead>
+                                <tr><th>年度</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計</th></tr>
+                            </thead>
+                            <tbody>
+                                ${groupedByPerson[pName].map(h => `
+                                    <tr>
+                                        <td style="text-align:center;">${h.year}</td>
+                                        <td>${(h.f1||0).toLocaleString()}</td><td>${(h.f2||0).toLocaleString()}</td>
+                                        <td>${(h.f3||0).toLocaleString()}</td><td>${(h.ye||0).toLocaleString()}</td>
+                                        <td>${(h.proj||0).toLocaleString()}</td>
+                                        <td style="font-weight:bold;">${(h.total||0).toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `).join('');
+            } else {
+                // --- 個人報表模式 ---
+                const sortedPersonal = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                let html = `
+                <div class="report-page">
+                    <h2 style="text-align:center; margin-bottom: 25px;">${name} - 個人歷年獎金明細報告</h2>
                     <table class="excel-report">
                         <thead>
-                            <tr><th>年度</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計</th></tr>
+                            <tr>
+                                <th style="width:15%;">年度</th>
+                                <th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th>
+                                <th style="width:15%;">總計</th>
+                                <th style="width:20%;">手寫備註</th>
+                            </tr>
                         </thead>
                         <tbody>
-                            ${groupedByPerson[pName].map(h => `
+                            ${sortedPersonal.map(h => `
                                 <tr>
                                     <td style="text-align:center;">${h.year}</td>
-                                    <td>${(h.f1||0).toLocaleString()}</td><td>${(h.f2||0).toLocaleString()}</td>
-                                    <td>${(h.f3||0).toLocaleString()}</td><td>${(h.ye||0).toLocaleString()}</td>
-                                    <td>${(h.proj||0).toLocaleString()}</td>
+                                    <td>${(h.f1||0).toLocaleString()}</td><td>${(h.f2||0).toLocaleString()}</td><td>${(h.f3||0).toLocaleString()}</td>
+                                    <td>${(h.ye||0).toLocaleString()}</td><td>${(h.proj||0).toLocaleString()}</td>
                                     <td style="font-weight:bold;">${(h.total||0).toLocaleString()}</td>
+                                    <td></td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
-                </div>
-            `).join('');
-        } else {
-            // --- 2. 個人報表模式 (維持原樣，但確保年份由舊到新) ---
-            const sortedPersonal = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
-            let html = `
-            <div class="report-page">
-                <h2 style="text-align:center; margin-bottom: 25px;">${name} - 個人歷年獎金明細報告</h2>
-                <table class="excel-report">
-                    <thead>
-                        <tr>
-                            <th style="width:15%;">年度</th>
-                            <th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th>
-                            <th style="width:15%;">總計</th>
-                            <th style="width:20%;">手寫備註</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${sortedPersonal.map(h => `
-                            <tr>
-                                <td style="text-align:center;">${h.year}</td>
-                                <td>${(h.f1||0).toLocaleString()}</td>
-                                <td>${(h.f2||0).toLocaleString()}</td>
-                                <td>${(h.f3||0).toLocaleString()}</td>
-                                <td>${(h.ye||0).toLocaleString()}</td>
-                                <td>${(h.proj||0).toLocaleString()}</td>
-                                <td style="font-weight:bold;">${(h.total||0).toLocaleString()}</td>
-                                <td></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                <div class="report-charts" style="margin-top: 50px;">
-                    <div class="chart-box"><h3>🏆 歷年獎金組成</h3><canvas id="printBarChart"></canvas></div>
-                    <div class="chart-box"><h3>📈 總額成長趨勢</h3><canvas id="printLineChart"></canvas></div>
-                </div>
-            </div>`;
-            inner.innerHTML = html;
-            setTimeout(() => { renderReportCharts(sortedPersonal); }, 500);
+                    <div class="report-charts" style="margin-top: 50px;">
+                        <div class="chart-box"><h3>🏆 歷年獎金組成</h3><canvas id="printBarChart"></canvas></div>
+                        <div class="chart-box"><h3>📈 總額成長趨勢</h3><canvas id="printLineChart"></canvas></div>
+                    </div>
+                </div>`;
+                inner.innerHTML = html;
+                setTimeout(() => { renderReportCharts(sortedPersonal); }, 500);
+            }
+            document.getElementById('reportModal').style.display = 'block';
+        } catch (err) { 
+            console.error("報表生成錯誤:", err);
+            alert("無法生成報表"); 
         }
-        document.getElementById('reportModal').style.display = 'block';
-    } catch (err) {
-        console.error("報表生成錯誤:", err);
-       } catch (err) { alert("無法生成報表"); }
-}
-}
+    }
+
+    // --- 3. 薪資歷史載入 (修正調幅計算) ---
+    async function loadSalaryHistoryLocal() {
+        const name = document.getElementById('selEmp').value;
+        const targetName = document.getElementById('salaryTargetName');
+        if(targetName) targetName.innerText = name;
+        const body = document.getElementById('salaryBody');
+        if(!body) return;
+        
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;">🔍 資料載入中...</td></tr>';
+        try {
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
+            const r = await res.json();
+            
+            if (r.status === "success" && r.history && r.history.length > 0) {
+                // 💡 先按日期「由舊到新」排序來計算百分比
+                let sortedOldToNew = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+                
+                let historyWithPercent = sortedOldToNew.map((h, i) => {
+                    let diffText = "-";
+                    if (i > 0) {
+                        const prevAmount = sortedOldToNew[i-1].amount;
+                        if (prevAmount > 0) {
+                            const diff = ((h.amount - prevAmount) / prevAmount) * 100;
+                            diffText = diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`;
+                        }
+                    }
+                    return { ...h, percent: diffText };
+                });
+
+                // 💡 顯示時反轉，讓最新的在上面
+                body.innerHTML = historyWithPercent.reverse().map(h => `
+                    <tr>
+                        <td style="font-weight:bold; color:var(--success); text-align:right;">$${Number(h.amount).toLocaleString()}</td>
+                        <td style="text-align:center; color: #d35400; font-weight: bold;">${h.percent}</td>
+                        <td style="text-align:center;">${h.date}</td>
+                        <td style="text-align:center;">${h.rank}</td>
+                        <td style="text-align:center;">${h.type || '-'}</td>
+                        <td style="text-align:left;">${h.note || '-'}</td>
+                    </tr>
+                `).join('');
+            } else {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center;">暫無紀錄</td></tr>';
+            }
+        } catch (e) {
+            console.error("載入失敗:", e);
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">連線失敗</td></tr>';
+        }
+    }
 </script>
 </body>
 </html>
