@@ -263,26 +263,98 @@
         } else alert("密碼錯誤");
     }
 
-    async function updateHistoryCharts() {
-        try {
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistoryComparison", empName: document.getElementById('selEmp').value }) });
-            const r = await res.json();
-            if(r.status === "success" && r.history.length > 0) {
-                const labels = r.history.map(d => d.year + '年');
-                const ctx = document.getElementById('historyCompareChart').getContext('2d');
-                if(historyCompareChart) historyCompareChart.destroy();
-                historyCompareChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{ label: '總獎金', data: r.history.map(d => d.total), backgroundColor: '#3498db' }]
+  async function updateHistoryCharts() {
+    try {
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify({ action: "getHistoryComparison", empName: document.getElementById('selEmp').value }) 
+        });
+        const r = await res.json();
+        
+        if(r.status === "success" && r.history.length > 0) {
+            // 💡 修正 1：確保年份排序正確 (由小到大 2023 -> 2024 -> 2025)
+            const sortedHistory = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+            const labels = sortedHistory.map(d => d.year + '年');
+            
+            // --- 渲染歷年獎金對比 (多色堆疊長條圖) ---
+            const ctx1 = document.getElementById('historyCompareChart').getContext('2d');
+            if(window.historyCompareChartInstance) window.historyCompareChartInstance.destroy();
+            window.historyCompareChartInstance = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '五一', data: sortedHistory.map(d => Number(d.f1 || 0)), backgroundColor: '#3498db' },
+                        { label: '端午', data: sortedHistory.map(d => Number(d.f2 || 0)), backgroundColor: '#2980b9' },
+                        { label: '中秋', data: sortedHistory.map(d => Number(d.f3 || 0)), backgroundColor: '#1f618d' },
+                        { label: '年終', data: sortedHistory.map(d => Number(d.ye || 0)), backgroundColor: '#27ae60' },
+                        { label: '專案', data: sortedHistory.map(d => Number(d.proj || 0)), backgroundColor: '#e67e22' }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        datalabels: {
+                            display: true,
+                            anchor: 'end',
+                            align: 'top',
+                            // 只顯示總計標籤在最上方
+                            formatter: (v, ctx) => {
+                                if (ctx.datasetIndex === ctx.chart.data.datasets.length - 1) {
+                                    let total = 0;
+                                    for(let i=0; i<ctx.chart.data.datasets.length; i++) {
+                                        total += Number(ctx.chart.data.datasets[i].data[ctx.dataIndex] || 0);
+                                    }
+                                    return total.toLocaleString();
+                                }
+                                return null;
+                            },
+                            font: { weight: 'bold' }
+                        }
                     },
-                    options: { maintainAspectRatio: false }
-                });
-            }
-        } catch (e) { console.error("圖表更新失敗", e); }
-    }
+                    scales: { 
+                        x: { stacked: true }, 
+                        y: { stacked: true, beginAtZero: true } 
+                    }
+                }
+            });
 
+            // --- 修正 2：重新呼叫趨勢折線圖函式 (確保底部圖表出現) ---
+            renderTrendChart(labels, sortedHistory.map(d => Number(d.total || 0)));
+        }
+    } catch (e) {
+        console.error("更新歷史圖表失敗:", e);
+    }
+}
+    function renderTrendChart(labels, data) {
+    const ctx2 = document.getElementById('historyTrendChart').getContext('2d');
+    if(window.historyTrendChartInstance) window.historyTrendChartInstance.destroy();
+    window.historyTrendChartInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '歷年總獎金成長趨勢',
+                data: data,
+                borderColor: '#e74c3c',
+                borderWidth: 3,
+                fill: false,
+                tension: 0.1,
+                pointRadius: 6,
+                pointBackgroundColor: '#e74c3c'
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                datalabels: { display: true, align: 'top', formatter: v => v.toLocaleString() }
+            },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
     function switchTab(tab) {
         const main = document.querySelectorAll('body > .card, #adminZone');
         const salary = document.getElementById('salaryPage');
@@ -350,15 +422,68 @@
     }
 
     function updateScoreChart() {
-        const ctx = document.getElementById('scoreChart').getContext('2d');
-        if (scoreChart) scoreChart.destroy();
-        const annVals = Array.from(document.querySelectorAll('.ann-in')).map((i, idx) => ({x: idx+1, y: parseFloat(i.value)}));
-        scoreChart = new Chart(ctx, {
-            type: 'line',
-            data: { datasets: [{ label: '評分趨勢', data: annVals.filter(v => !isNaN(v.y)), borderColor: '#3498db' }] },
-            options: { maintainAspectRatio: false, scales: { x: { type: 'linear', min: 1, max: 12 } } }
-        });
+    const ctx = document.getElementById('scoreChart').getContext('2d');
+    if (scoreChart) scoreChart.destroy();
+    
+    // 取得當前輸入的數值
+    const annInputs = Array.from(document.querySelectorAll('.ann-in'));
+    const prjInputs = Array.from(document.querySelectorAll('.prj-in'));
+    
+    // 修正資料結構，讓 datalabels 只顯示 y 軸數值
+    const annData = annInputs.map((i, idx) => ({ x: idx + 1, y: parseFloat(i.value) })).filter(v => !isNaN(v.y));
+    const prjData = prjInputs.map((i, idx) => ({ x: idx + 1, y: parseFloat(i.value) })).filter(v => !isNaN(v.y));
+
+    scoreChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [
+                { label: '年度評分', data: annData, borderColor: '#3498db', fill: false, tension: 0.1 },
+                { label: '專案評分', data: prjData, borderColor: '#e67e22', borderDash: [5, 5], fill: false }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false,
+            scales: { 
+                x: { type: 'linear', min: 1, max: 12, ticks: { stepSize: 1, callback: v => v + '月' } },
+                y: { beginAtZero: false }
+            },
+            plugins: {
+                datalabels: {
+                    display: true,
+                    align: 'top',
+                    // 💡 關鍵修正：只回傳 y 的數值，不顯示 xy 結構
+                    formatter: (v) => v.y, 
+                    font: { weight: 'bold' }
+                }
+            }
+        }
+    });
+}
+    async function openReport(mode) {
+    const name = document.getElementById('selEmp').value;
+    const payload = mode === 'all' ? { action: "getHistoryComparison" } : { action: "getHistoryComparison", empName: name };
+    
+    try {
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+        const r = await res.json();
+        
+        let html = "";
+        if (mode === 'all') {
+            html = `<h2 style="text-align:center;">全體人員獎金總表</h2><table class="excel-report"><thead><tr><th>姓名</th><th>年度</th><th>總獎金</th></tr></thead><tbody>`;
+            html += r.history.map(h => `<tr><td>${h.empName}</td><td>${h.year}</td><td>${h.total.toLocaleString()}</td></tr>`).join('');
+            html += `</tbody></table>`;
+        } else {
+            html = `<h2 style="text-align:center;">${name} 個人績效報表</h2><table class="excel-report"><thead><tr><th>年度</th><th>總獎金</th></tr></thead><tbody>`;
+            html += r.history.map(h => `<tr><td>${h.year}</td><td>${h.total.toLocaleString()}</td></tr>`).join('');
+            html += `</tbody></table>`;
+        }
+        
+        document.getElementById('reportInner').innerHTML = html;
+        document.getElementById('reportModal').style.display = 'block';
+    } catch (err) {
+        alert("讀取報表失敗");
     }
+}
 </script>
 </body>
 </html>
