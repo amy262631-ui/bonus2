@@ -144,18 +144,28 @@
         } catch (e) { console.error("初始化失敗", e); }
     };
 
-    function initUI() {
+   function initUI() {
         const sel = document.getElementById('selEmp');
+        if (!sel || sel.selectedIndex === -1) return; // 安全檢查
+
         const opt = sel.options[sel.selectedIndex];
         const rank = (opt.getAttribute('data-rank') || "L1").trim().toUpperCase();
         const salary = opt.getAttribute('data-salary') || 0;
         const isL1 = (rank === 'L1');
 
-        document.getElementById('salaryBody').innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 載入中...</td></tr>';
-        if (scoreChart) scoreChart.destroy();
+        // 💡 修正 1：立刻清空表格並顯示載入中，避免 A 人員看到 B 人員的資料
+        const salaryBody = document.getElementById('salaryBody');
+        if (salaryBody) salaryBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 載入中...</td></tr>';
+        
+        // 💡 修正 2：銷毀舊圖表實例，避免標籤重疊
+        if (scoreChart) {
+            scoreChart.destroy();
+            scoreChart = null;
+        }
 
         timelineData = { Q1:{r:rank,s:salary}, Q2:{r:rank,s:salary}, Q3:{r:rank,s:salary}, Q4:{r:rank,s:salary} };
         
+        // 💡 修正 3：動態標籤文字 (L1 顯示月份，L2-L4 顯示每季)
         let h1 = '', count = isL1 ? 12 : 4;
         for(let i=1; i<=count; i++) {
             const label = isL1 ? i + '月' : 'Q' + i;
@@ -166,7 +176,10 @@
         
         document.getElementById('annualInputs').innerHTML = h1;
         document.getElementById('projInputs').innerHTML = h2;
+        
+        // 💡 修正 4：同時觸發獎金試算與薪資歷史載入
         autoCalc(true);
+        if (typeof loadSalaryHistoryLocal === 'function') loadSalaryHistoryLocal();
     }
 
     function runLiveCalc() {
@@ -181,6 +194,7 @@
     }
 
     async function autoCalc(forceSync = false) {
+        if (isUserTyping && !forceSync) return;
         const payload = {
             action: "calculateBonus",
             empName: document.getElementById('selEmp').value,
@@ -205,7 +219,7 @@
                 updateAdminTableUI(r.historyAdjs);
                 updateHistoryCharts();
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("同步失敗:", e); }
     }
 
     function renderTimelineUI() {
