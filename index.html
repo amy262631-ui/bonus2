@@ -128,15 +128,10 @@
 
 <script>
   const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
-    
-    // 💡 必須確保這些變數都有宣告
-    let scoreChart = null;
-    let historyCompareChartInstance = null;
-    let historyTrendChartInstance = null;
-    let timelineData = {};
-    let baseResults = {};
-    let isUserTyping = false; // 👈 補上這這一行就解決第一個報錯
-
+let scoreChart = null, historyCompareChartInstance = null, historyTrendChartInstance = null;
+let timelineData = {}, baseResults = {};
+// 💡 必須補上這一行，否則專案試算會因 ReferenceError 而停止運算
+let isUserTyping = false;
     window.onload = async () => {
         try {
             const res = await fetch(API_URL);
@@ -415,7 +410,16 @@
     }
 
     function getPerfMult_Frontend(s, type) { s = parseFloat(s); if (isNaN(s) || s <= 0) return 0; if (type === "quarterly") return s >= 90 ? 1.2 : s >= 80 ? 1.0 : s >= 70 ? 0.8 : s >= 60 ? 0.7 : 0.5; return s >= 90 ? 1.5 : s >= 80 ? 1.3 : s >= 70 ? 1.0 : s >= 60 ? 0.7 : 0.5; }
-    function getProjectMultiplier_Frontend(s) { s = parseFloat(s); if (isNaN(s) || s <= 0) return 0; return s >= 90 ? 1.0 : s >= 80 ? 0.8 : s >= 70 ? 0.6 : s >= 60 ? 0.4 : 0.2; }
+    function getProjectMultiplier_Frontend(s) {
+    s = parseFloat(s); 
+    if (isNaN(s) || s <= 0) return 0;
+    // 💡 嚴格對應您的專案評分標準
+    if (s >= 90) return 1.0; 
+    if (s >= 80) return 0.8; 
+    if (s >= 70) return 0.6; 
+    if (s >= 60) return 0.4; 
+    return 0.2;
+}
 </script>
 </body>
 </html>
