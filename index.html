@@ -232,28 +232,28 @@ async function autoCalc(forceSync = false) {
             baseResults.yearConfigs = r.yearConfigs;
             
             if(forceSync) {
-                // 💡 1. 填入年度評分 (1月-12月 或 Q1-Q4)
+                // 💡 填入歷史年度評分
                 if(r.historyScores) {
                     const annInputs = document.querySelectorAll('.ann-in');
                     r.historyScores.forEach((v, i) => { if(annInputs[i]) annInputs[i].value = v || ""; });
                 }
                 
-                // 💡 2. 填入專案評分 (1月-12月)
+                // 💡 填入歷史專案評分 (解決讀不到分數問題)
                 if(r.historyProjScores) {
                     const prjInputs = document.querySelectorAll('.prj-in');
-                    // 確保 historyProjScores 是陣列
-                    const pScores = Array.isArray(r.historyProjScores) ? r.historyProjScores : [];
-                    pScores.forEach((v, i) => { if(prjInputs[i]) prjInputs[i].value = v || ""; });
+                    r.historyProjScores.forEach((v, i) => { if(prjInputs[i]) prjInputs[i].value = v || ""; });
                 }
 
                 if(r.historyTimeline) timelineData = r.historyTimeline;
-                runLiveCalc(); // 填完分數後立即重新計算平均值與圖表
+                runLiveCalc(); // 重新觸發畫面數據計算
             }
             renderTimelineUI();
             updateAdminTableUI(r.historyAdjs);
             updateHistoryCharts();
         }
-    } catch(e) { console.error("計算失敗", e); }
+    } catch(e) { 
+        console.error("同步失敗:", e); 
+    }
 }
 
 function renderTimelineUI() {
