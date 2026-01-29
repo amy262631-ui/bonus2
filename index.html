@@ -212,6 +212,7 @@ function runLiveCalc() {
 
 async function autoCalc(forceSync = false) {
     if (isUserTyping && !forceSync) return;
+    
     const payload = {
         action: "calculateBonus",
         empName: document.getElementById('selEmp').value,
@@ -221,24 +222,32 @@ async function autoCalc(forceSync = false) {
         avgScore: document.getElementById('avgSpan').innerText,
         projAvg: document.getElementById('projAvgSpan').innerText
     };
+    
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
+        
         if(r.status === "success") {
             baseResults = r.data;
             baseResults.yearConfigs = r.yearConfigs;
+            
             if(forceSync) {
-                // 💡 關鍵: 載入年度評分
+                // 💡 1. 填入年度評分 (1月-12月 或 Q1-Q4)
                 if(r.historyScores) {
-                    document.querySelectorAll('.ann-in').forEach((el, i) => el.value = r.historyScores[i] || "");
+                    const annInputs = document.querySelectorAll('.ann-in');
+                    r.historyScores.forEach((v, i) => { if(annInputs[i]) annInputs[i].value = v || ""; });
                 }
-                // 💡 關鍵: 載入專案評分 (解決專案分數沒讀到問題)
+                
+                // 💡 2. 填入專案評分 (1月-12月)
                 if(r.historyProjScores) {
-                    const projInputs = document.querySelectorAll('.prj-in');
-                    r.historyProjScores.forEach((val, i) => { if(projInputs[i]) projInputs[i].value = val || ""; });
+                    const prjInputs = document.querySelectorAll('.prj-in');
+                    // 確保 historyProjScores 是陣列
+                    const pScores = Array.isArray(r.historyProjScores) ? r.historyProjScores : [];
+                    pScores.forEach((v, i) => { if(prjInputs[i]) prjInputs[i].value = v || ""; });
                 }
+
                 if(r.historyTimeline) timelineData = r.historyTimeline;
-                runLiveCalc();
+                runLiveCalc(); // 填完分數後立即重新計算平均值與圖表
             }
             renderTimelineUI();
             updateAdminTableUI(r.historyAdjs);
@@ -337,9 +346,11 @@ async function openReport(mode) {
     const inner = document.getElementById('reportInner');
     const name = document.getElementById('selEmp').value;
     const payload = { action: "getHistoryComparison", empName: (mode === 'all' ? "" : name) };
+    
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
+        
         if (r.status === "success" && r.history.length > 0) {
             if (mode === 'all') {
                 const grouped = r.history.reduce((acc, curr) => {
@@ -347,22 +358,31 @@ async function openReport(mode) {
                     acc[curr.empName].push(curr);
                     return acc;
                 }, {});
+
+                // 💡 修正：增加人名表頭與強制換頁
                 inner.innerHTML = Object.keys(grouped).sort().map(pName => `
-                    <div class="report-page" style="page-break-after: always; padding: 20px;">
-                        <h2 style="text-align:center;">獎金總結表 - ${pName}</h2>
-                        <table class="excel-report" style="width:100%;">
+                    <div class="report-page" style="page-break-after: always; padding: 20px; border-bottom: 2px solid #eee;">
+                        <h2 style="text-align:center;">${pName} - 歷年獎金明細總結表</h2>
+                        <table class="excel-report">
                             <thead><tr><th>年度</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計</th></tr></thead>
-                            <tbody>${grouped[pName].map(h => `
-                                <tr><td>${h.year}</td><td>${h.f1.toLocaleString()}</td><td>${h.f2.toLocaleString()}</td><td>${h.f3.toLocaleString()}</td><td>${h.ye.toLocaleString()}</td><td>${h.proj.toLocaleString()}</td><td style="font-weight:bold;">${h.total.toLocaleString()}</td></tr>
-                            `).join('')}</tbody>
+                            <tbody>
+                                ${grouped[pName].map(h => `
+                                    <tr>
+                                        <td style="text-align:center;">${h.year}</td>
+                                        <td>${h.f1.toLocaleString()}</td><td>${h.f2.toLocaleString()}</td><td>${h.f3.toLocaleString()}</td>
+                                        <td>${h.ye.toLocaleString()}</td><td>${h.proj.toLocaleString()}</td>
+                                        <td style="font-weight:bold; background:#fff3cd;">${h.total.toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
                         </table>
                     </div>`).join('');
             } else {
-                // 個人模式渲染 (略)
-                document.getElementById('reportModal').style.display = 'block';
+                // 個人報表邏輯...
             }
+            document.getElementById('reportModal').style.display = 'block';
         }
-    } catch (err) { alert("連線失敗"); }
+    } catch (err) { alert("報表生成失敗"); }
 }
 
 function renderPersonalCharts(data) {
