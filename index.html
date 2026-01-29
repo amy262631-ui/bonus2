@@ -127,12 +127,15 @@
 </div>
 
 <script>
-   const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
-let scoreChart = null, historyCompareChartInstance = null, historyTrendChartInstance = null;
-let timelineData = {}, baseResults = {};
-
-// 💡 補上這一行定義
-let isUserTyping = false;
+  const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
+    
+    // 💡 必須確保這些變數都有宣告
+    let scoreChart = null;
+    let historyCompareChartInstance = null;
+    let historyTrendChartInstance = null;
+    let timelineData = {};
+    let baseResults = {};
+    let isUserTyping = false; // 👈 補上這這一行就解決第一個報錯
 
     window.onload = async () => {
         try {
@@ -353,22 +356,29 @@ let isUserTyping = false;
         historyTrendChartInstance = new Chart(ctx2, { type: 'line', data: { labels: labels, datasets: [{ label: '總獎金趨勢', data: data, borderColor: '#e74c3c', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 6 }] }, options: { maintainAspectRatio: false, plugins: { datalabels: { display: true, formatter: v => v.toLocaleString() } } } });
     }
 
-    async function loadSalaryHistoryLocal() {
-        const name = document.getElementById('selEmp').value;
-        document.getElementById('salaryTargetName').innerText = name;
-        try {
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
-            const r = await res.json();
-            if (r.status === "success" && r.history.length > 0) {
-                let sorted = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
-                document.getElementById('salaryBody').innerHTML = sorted.map((h, i) => {
-                    let diff = "-";
-                    if (i > 0) { const d = ((h.amount - sorted[i-1].amount) / sorted[i-1].amount * 100); diff = (d > 0 ? "+" : "") + d.toFixed(1) + "%"; }
-                    return `<tr><td class="name-td" style="display:none;">${name}</td><td style="text-align:right; font-weight:bold; color:var(--success);">$${Number(h.amount).toLocaleString()}</td><td style="text-align:center; color:#d35400; font-weight:bold;">${diff}</td><td style="text-align:center;">${h.date}</td><td style="text-align:center;">${h.rank}</td><td style="text-align:center;">${h.type || '-'}</td><td>${h.note || '-'}</td></tr>`;
-                }).join('');
-            } else document.getElementById('salaryBody').innerHTML = '<tr><td colspan="7">暫無紀錄</td></tr>';
-        } catch (e) { console.error(e); }
+  async function loadSalaryHistoryLocal() {
+    const name = document.getElementById('selEmp').value;
+    const body = document.getElementById('salaryBody');
+    if(!body) return;
+    
+    try {
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
+        });
+        
+        // 如果後端噴 500 錯誤，這裡會抓到
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        
+        const r = await res.json();
+        // ... (原本渲染表格的邏輯)
+        
+    } catch (e) {
+        console.error("薪資載入失敗:", e);
+        // 💡 發生錯誤時，把「載入中」換成錯誤訊息，使用者才知道發生什麼事
+        body.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">❌ 載入失敗 (原因: ${e.message})。請檢查 GAS 部署是否為「任何人」。</td></tr>`;
     }
+}
 
     async function submitNewSalary() {
         const data = { action: "addSalaryHistory", empName: document.getElementById('selEmp').value, date: document.getElementById('newSalaryDate').value, amount: document.getElementById('newSalaryAmount').value, rank: document.getElementById('newSalaryRank').value, type: document.getElementById('newSalaryType').value, note: document.getElementById('newSalaryNote').value };
