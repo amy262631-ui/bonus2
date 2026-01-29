@@ -228,22 +228,30 @@ async function autoCalc(forceSync = false) {
             baseResults = r.data;
             baseResults.yearConfigs = r.yearConfigs;
             
-            if(forceSync) {
-                // 💡 填入歷史年度評分
-                if(r.historyScores) {
-                    const annInputs = document.querySelectorAll('.ann-in');
-                    r.historyScores.forEach((v, i) => { if(annInputs[i]) annInputs[i].value = v || ""; });
-                }
-                
-                // 💡 填入歷史專案評分 (解決讀不到分數問題)
-                if(r.historyProjScores) {
-                    const prjInputs = document.querySelectorAll('.prj-in');
-                    r.historyProjScores.forEach((v, i) => { if(prjInputs[i]) prjInputs[i].value = v || ""; });
-                }
+          if (forceSync) {
+    // 年度分數：只塞「數字」或空字串
+    if (r.historyScores && Array.isArray(r.historyScores)) {
+        const annInputs = document.querySelectorAll('.ann-in');
+        r.historyScores.forEach((v, i) => {
+            if (!annInputs[i]) return;
+            const num = parseFloat(v);
+            annInputs[i].value = isNaN(num) ? "" : num;
+        });
+    }
 
-                if(r.historyTimeline) timelineData = r.historyTimeline;
-                runLiveCalc(); // 重新觸發畫面數據計算
-            }
+    // 專案分數：只塞「數字」或空字串
+    if (r.historyProjScores && Array.isArray(r.historyProjScores)) {
+        const prjInputs = document.querySelectorAll('.prj-in');
+        r.historyProjScores.forEach((v, i) => {
+            if (!prjInputs[i]) return;
+            const num = parseFloat(v);
+            prjInputs[i].value = isNaN(num) ? "" : num;
+        });
+    }
+
+    if (r.historyTimeline) timelineData = r.historyTimeline;
+    runLiveCalc();
+}
             renderTimelineUI();
             updateAdminTableUI(r.historyAdjs);
             updateHistoryCharts();
@@ -281,25 +289,43 @@ function updateAdminTableUI(adjs = null) {
     let ref = 0;
     let adj = 0;
 
+    // 安全地把 adjs 裡的東西轉成數字，不是數字就當 0
+    if (adjs && Array.isArray(adjs)) {
+        if (item === 'proj') {
+            // 專案目前沒有獨立的「調整金額」，先固定 0
+            adj = 0;
+        } else if (item === 'ye') {
+            adj = parseFloat(adjs[3]) || 0; // 對應 history 的 ye_adj
+        } else {
+            adj = parseFloat(adjs[i]) || 0; // f1/f2/f3 對應 0,1,2
+        }
+    }
+
     if (item === 'proj') {
         const projAvg = parseFloat(document.getElementById('projAvgSpan').innerText) || 0;
-        const base = adjs ? (adjs[4] || 80000) : 80000; // history[17] or default 80000
+        const base = adjs ? (parseFloat(adjs[4]) || 80000) : 80000; // history[17] 或預設 80000
         ref = Math.round(base * getProjectMultiplier_Frontend(projAvg));
-        // 目前沒有真正的 proj_adj 欄位，就先不加 adj
     } else if (item === 'ye') {
-        // 原本邏輯保持，但 adj 來自 adjs[3]
-        adj = adjs ? (parseFloat(adjs[3]) || 0) : 0;
-        // ...
+        const q4 = timelineData.Q4;
+        const cfg = baseResults.yearConfigs || {};
+        const yeBase = q4.r === "L1" ? (cfg.L1_Over_1Y || 0.5) : (cfg[q4.r+'_Base'] || 1.0);
+        const avgScore = parseFloat(document.getElementById('avgSpan').innerText) || 0;
+        ref = Math.round(q4.s * yeBase * getPerfMult_Frontend(avgScore, "annual"));
     } else {
-        // f1, f2, f3 → adj 分別來自 adjs[0], adjs[1], adjs[2]
-        adj = adjs ? (parseFloat(adjs[i]) || 0) : 0;
-        // ...
+        const q = timelineData['Q'+(i+1)];
+        const cfg = baseResults.yearConfigs || {};
+        const base = q.r === "L1" ? 0 : (cfg[q.r+'_Base'] || 1.0);
+        const qScore = parseFloat(document.querySelectorAll('.ann-in')[i]?.value) || 0;
+        ref = q.r === "L1" ? (cfg.L1_Fest_Over_6M || 1000) : 
+              Math.round(q.s * 0.25 * base * getPerfMult_Frontend(qScore, "quarterly"));
     }
+
+    const finalValue = ref + adj; // 一定是數字
 
     html += `<td>
         <span class="reference-text">參考:${ref.toLocaleString()}</span>
         <input type="number" class="target-input" id="target_${item}" 
-               value="${(ref + adj).toLocaleString().replace(/,/g,'')}" oninput="refreshTotal()">
+               value="${finalValue}" oninput="refreshTotal()">
     </td>`;
 });
     
