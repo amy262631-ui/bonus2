@@ -277,7 +277,9 @@ let baseResults = {};
         } catch(e) { alert("連線失敗"); }
     }
 
-  async function openReport(mode) {
+  // --- 2. 報表渲染邏輯 (前端 script) ---
+async function openReport(mode) {
+    const inner = document.getElementById('reportInner');
     const name = document.getElementById('selEmp').value;
     const payload = { action: "getHistoryComparison", empName: (mode === 'all' ? "" : name) };
     
@@ -285,28 +287,48 @@ let baseResults = {};
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
         
-        // 🔍 除錯用：請在瀏覽器按 F12 看看這裡有沒有出現 2023 的資料
-        console.log("雲端回傳的歷史資料：", r.history);
-
-        if (r.status === "success" && r.history) {
-            // 確保按年份「由舊到新」排序，讓 2023 在最上面
-            const sortedData = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
-            
+        if (r.status === "success" && r.history.length > 0) {
             if (mode === 'all') {
-                const grouped = sortedData.reduce((acc, curr) => {
+                // 按人名分組，實現一人一頁
+                const grouped = r.history.reduce((acc, curr) => {
                     if (!acc[curr.empName]) acc[curr.empName] = [];
                     acc[curr.empName].push(curr);
                     return acc;
                 }, {});
-                
-                renderAllReports(grouped); // 呼叫渲染函式
+
+                inner.innerHTML = Object.keys(grouped).sort().map(pName => `
+                    <div class="report-page" style="page-break-after: always; padding: 20px;">
+                        <h2 style="text-align:center;">獎金明細表 - ${pName}</h2>
+                        <table class="excel-report">
+                            <thead><tr><th>年度</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計</th></tr></thead>
+                            <tbody>${grouped[pName].map(h => `
+                                <tr><td>${h.year}</td><td>${h.f1.toLocaleString()}</td><td>${h.f2.toLocaleString()}</td><td>${h.f3.toLocaleString()}</td><td>${h.ye.toLocaleString()}</td><td>${h.proj.toLocaleString()}</td><td style="font-weight:bold;">${h.total.toLocaleString()}</td></tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>`).join('');
             } else {
-                renderSingleReport(name, sortedData);
+                // 個人報表 (含 2023 歷史)
+                inner.innerHTML = `
+                    <div class="report-page">
+                        <h2 style="text-align:center;">${name} 個人歷年獎金明細</h2>
+                        <table class="excel-report">
+                            <thead><tr><th>年度</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計</th></tr></thead>
+                            <tbody>${r.history.map(h => `
+                                <tr><td>${h.year}</td><td>${h.f1.toLocaleString()}</td><td>${h.f2.toLocaleString()}</td><td>${h.f3.toLocaleString()}</td><td>${h.ye.toLocaleString()}</td><td>${h.proj.toLocaleString()}</td><td style="font-weight:bold;">${h.total.toLocaleString()}</td></tr>
+                            `).join('')}</tbody>
+                        </table>
+                        <div class="report-charts" style="display:flex; gap:10px; height:300px;">
+                            <canvas id="printPieChart"></canvas>
+                            <canvas id="printLineChart"></canvas>
+                        </div>
+                    </div>`;
+                setTimeout(() => renderPersonalCharts(r.history), 500);
             }
+            document.getElementById('reportModal').style.display = 'block';
+        } else {
+            alert("查無歷史資料");
         }
-    } catch (err) {
-        alert("連線失敗，請檢查網路或 GAS 部署權限");
-    }
+    } catch (err) { alert("連線失敗"); }
 }
 
     function renderPersonalCharts(data) {
@@ -346,27 +368,57 @@ let baseResults = {};
         historyTrendChartInstance = new Chart(ctx2, { type: 'line', data: { labels: labels, datasets: [{ label: '總獎金趨勢', data: data, borderColor: '#e74c3c', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 6 }] }, options: { maintainAspectRatio: false, plugins: { datalabels: { display: true, formatter: v => v.toLocaleString() } } } });
     }
 
-  async function loadSalaryHistoryLocal() {
+ async function loadSalaryHistoryLocal() {
     const name = document.getElementById('selEmp').value;
     const body = document.getElementById('salaryBody');
-    if(!body) return;
+    const targetName = document.getElementById('salaryTargetName');
     
+    if (targetName) targetName.innerText = name; // 更新標題姓名
+    if (!body) return;
+
     try {
         const res = await fetch(API_URL, { 
             method: "POST", 
             body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
         });
-        
-        // 如果後端噴 500 錯誤，這裡會抓到
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        
+
+        if (!res.ok) throw new Error(`HTTP 錯誤! 狀態: ${res.status}`);
+
         const r = await res.json();
-        // ... (原本渲染表格的邏輯)
         
+        if (r.status === "success" && r.history && r.history.length > 0) {
+            // 💡 排序：最早入職放最上面 (2022 -> 2025)
+            let sorted = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            body.innerHTML = sorted.map((h, i) => {
+                let diffText = "-";
+                // 💡 計算調幅：(目前金額 - 前一筆金額) / 前一筆金額
+                if (i > 0) {
+                    const prevAmount = sorted[i-1].amount;
+                    if (prevAmount > 0) {
+                        const d = ((h.amount - prevAmount) / prevAmount * 100);
+                        diffText = (d > 0 ? "+" : "") + d.toFixed(1) + "%";
+                    }
+                }
+                
+                // 💡 渲染 7 個 <td> 以對齊標題 (包含隱藏的姓名欄)
+                return `
+                    <tr>
+                        <td class="name-td" style="display:none; text-align:center;">${name}</td>
+                        <td style="text-align:right; font-weight:bold;">$${Number(h.amount).toLocaleString()}</td>
+                        <td style="text-align:center; color:#d35400; font-weight:bold;">${diffText}</td>
+                        <td style="text-align:center;">${h.date}</td>
+                        <td style="text-align:center;">${h.rank}</td>
+                        <td style="text-align:center;">${h.type || '-'}</td>
+                        <td style="text-align:left;">${h.note || '-'}</td>
+                    </tr>`;
+            }).join('');
+        } else {
+            body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">🔍 暫無歷史薪資紀錄</td></tr>';
+        }
     } catch (e) {
         console.error("薪資載入失敗:", e);
-        // 💡 發生錯誤時，把「載入中」換成錯誤訊息，使用者才知道發生什麼事
-        body.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">❌ 載入失敗 (原因: ${e.message})。請檢查 GAS 部署是否為「任何人」。</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">❌ 載入失敗 (原因: ${e.message})。<br>請確認 Google Apps Script 部署設定為「任何人」。</td></tr>`;
     }
 }
 
