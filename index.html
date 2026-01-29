@@ -30,17 +30,46 @@
     .excel-report th, .excel-report td { border: 1px solid #000; padding: 12px; font-size: 18px; }
     .excel-report th { background: #e8e8e8; }
         
-    @media print {
-    #salaryPage { width: 100% !important; border: none !important; box-shadow: none !important; }
-    .excel-report { width: 100% !important; table-layout: auto !important; }
-    .name-col { display: table-cell !important; } /* 列印時強制顯示姓名 */
-}
-    @media print {
-        body * { visibility: hidden; }
-        #reportModal, #reportModal *, #salaryPage, #salaryPage * { visibility: visible; }
-        .no-print { display: none !important; }
-        #salaryPage, #reportModal { position: absolute; left: 0; top: 0; width: 100%; }
+ @media print {
+    /* 1. 隱藏不必要的元素 (保持畫面乾淨) */
+    body * { visibility: hidden; }
+    .no-print, .btn, #salaryAddZone, .header-controls, #adminZone { display: none !important; }
+
+    /* 2. 顯示並強制撐滿列印頁面 (薪資頁與報表) */
+    #salaryPage, #salaryPage *, #reportModal, #reportModal * { visibility: visible; }
+    
+    #salaryPage, #reportModal { 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 100% !important; 
+        margin: 0 !important; 
+        padding: 0 !important;
+        display: block !important;
     }
+
+    /* 3. 表格核心修正：防止標題缺角 */
+    .excel-report { 
+        width: 100% !important; 
+        table-layout: fixed !important; /* 💡 關鍵：固定寬度布局，欄位才不會跑掉 */
+        border-collapse: collapse !important;
+        visibility: visible;
+    }
+
+    /* 4. 欄位對齊與邊框 */
+    .excel-report th, .excel-report td { 
+        border: 1px solid #000 !important; 
+        padding: 8px 4px !important; 
+        font-size: 14px !important; 
+        visibility: visible;
+    }
+
+    /* 5. 強制顯示姓名欄 (全體模式) */
+    #thNameCol, .name-col { 
+        display: table-cell !important; 
+        visibility: visible;
+    }
+}
     </style>
 </head>
 <body>
@@ -436,15 +465,56 @@ async function loadSalaryHistoryLocal() {
         if(r.status === "success") { alert("新增成功"); loadSalaryHistoryLocal(); }
     }
 
-    async function printSalary(mode) {
-        if (mode === 'all') {
-            document.getElementById('thNameCol').style.display = 'table-cell';
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getAllSalaryHistory" }) });
+async function printSalary(mode) {
+    const nameSpan = document.getElementById('salaryTargetName');
+    const nameCol = document.getElementById('thNameCol'); // 標題的姓名欄
+    const body = document.getElementById('salaryBody');
+
+    if (mode === 'all') {
+        nameSpan.innerText = "全體人員薪資變動清冊";
+        if (nameCol) nameCol.style.display = 'table-cell'; // 💡 顯示標題姓名欄
+        
+        try {
+            const res = await fetch(API_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ action: "getAllSalaryHistory" }) 
+            });
             const r = await res.json();
-            document.getElementById('salaryBody').innerHTML = r.data.map(h => `<tr><td>${h.name}</td><td>$${h.amount.toLocaleString()}</td><td>-</td><td>${h.date}</td><td>${h.rank}</td><td>${h.note}</td></tr>`).join('');
+            if(r.status === "success") {
+                // 💡 關鍵排序：按人員姓名 + 日期(舊到新) 排序
+                const sortedAll = r.data.sort((a, b) => {
+                    if (a.name !== b.name) return a.name.localeCompare(b.name);
+                    return new Date(a.date) - new Date(b.date);
+                });
+
+                // 💡 確保這裡輸出的 <td> 數量與 <thead> 的 <th> 數量完全一致 (共7格)
+                body.innerHTML = sortedAll.map(h => `
+                    <tr>
+                        <td style="text-align:center;">${h.name}</td>
+                        <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
+                        <td style="text-align:center;">-</td> <td style="text-align:center;">${h.date}</td>
+                        <td style="text-align:center;">${h.rank}</td>
+                        <td style="text-align:center;">${h.type || '-'}</td>
+                        <td style="text-align:left;">${h.note || '-'}</td>
+                    </tr>
+                `).join('');
+            }
+        } catch(e) {
+            alert("讀取全體資料失敗");
+            return;
         }
-        setTimeout(() => { window.print(); if(mode === 'all') loadSalaryHistoryLocal(); }, 500);
+    } else {
+        // 個人模式：隱藏姓名欄 (維持原本邏輯)
+        if (nameCol) nameCol.style.display = 'none';
+        await loadSalaryHistoryLocal(); // 確保個人模式是舊到新
     }
+
+    // 💡 執行列印
+    setTimeout(() => { 
+        window.print(); 
+        if(mode === 'all') loadSalaryHistoryLocal(); 
+    }, 500);
+}
 
     function getPerfMult_Frontend(s, type) {
         s = parseFloat(s); if (isNaN(s) || s <= 0) return 0;
