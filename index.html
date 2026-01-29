@@ -27,14 +27,56 @@
     .excel-report th { background: #e8e8e8; }
     .report-charts { display: flex; gap: 20px; margin-top: 30px; }
     .chart-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 10px; height: 400px; }
+
     @media print {
-        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, .score-container, canvas:not([id^="print"]), .avg-display { display: none !important; }
-        #salaryPage, #reportModal { display: block !important; position: relative !important; width: 100% !important; margin: 0 !important; }
+        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone,
+        .score-container, canvas:not([id^="print"]), .avg-display {
+            display: none !important;
+        }
+
+        #salaryPage, #reportModal {
+            display: block !important;
+            position: relative !important;
+            width: 100% !important;
+            margin: 0 !important;
+        }
+
         #reportModal { background: white !important; }
-        .excel-report { width: 100% !important; table-layout: fixed !important; }
-        .excel-report th, .excel-report td { border: 1px solid #000 !important; font-size: 14px !important; }
-        #thNameCol, .name-td { display: table-cell !important; }
-        .report-page { page-break-after: always !important; }
+
+        .excel-report {
+            width: 100% !important;
+            table-layout: fixed !important;
+        }
+
+        .excel-report th, .excel-report td {
+            border: 1px solid #000 !important;
+            font-size: 14px !important;
+        }
+
+        #thNameCol, .name-td {
+            display: table-cell !important;
+        }
+
+        .report-page {
+            page-break-after: always !important;
+        }
+
+        /* 只列印獎金報表時：隱藏薪資頁 */
+        body.print-bonus #salaryPage {
+            display: none !important;
+        }
+
+        /* 只列印薪資時：隱藏獎金畫面與獎金報表 */
+        body.print-salary .card:not(#salaryPage),
+        body.print-salary #reportModal {
+            display: none !important;
+        }
+
+        /* 薪資列印時一定要把姓名欄顯示出來 */
+        body.print-salary #thNameCol,
+        body.print-salary .name-td {
+            display: table-cell !important;
+        }
     }
     </style>
 </head>
@@ -68,6 +110,7 @@
     </div>
     <div style="height:400px;"><canvas id="scoreChart"></canvas></div>
 </div>
+
 <div id="adminZone" style="display:none;">
     <div class="card" style="border: 2px solid var(--danger);">
         <h2 style="color:var(--danger);">主管獎金核定區</h2>
@@ -90,20 +133,27 @@
         <div style="height:350px; margin-top:40px;"><canvas id="historyTrendChart"></canvas></div>
     </div>
 </div>
+
 <div id="reportModal">
     <div class="report-content">
         <button class="btn no-print" style="position:absolute; top:20px; right:120px; background:#7f8c8d;" onclick="document.getElementById('reportModal').style.display='none'">✖ 關閉</button>
-        <button class="btn no-print" style="position:absolute; top:20px; right:20px; background:var(--accent);" onclick="window.print()">🖨️ 列印</button>
+        <button class="btn no-print" style="position:absolute; top:20px; right:20px; background:var(--accent);" onclick="printBonusReport()">🖨️ 列印</button>
         <div id="reportInner"></div>
     </div>
 </div>
+
 <div id="salaryPage" style="display:none;" class="card">
     <h2 style="color:var(--primary); border-bottom:2px solid var(--accent); padding-bottom:10px;">💵 薪資歷史 - <span id="salaryTargetName"></span></h2>
     <div id="salaryAddZone" class="no-print" style="background:#f9f9f9; padding:15px; margin:15px 0; border-radius:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
             <input type="date" id="newSalaryDate">
             <input type="number" id="newSalaryAmount" placeholder="金額">
-            <select id="newSalaryRank"><option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option><option value="L4">L4</option></select>
+            <select id="newSalaryRank">
+                <option value="L1">L1</option>
+                <option value="L2">L2</option>
+                <option value="L3">L3</option>
+                <option value="L4">L4</option>
+            </select>
             <input type="text" id="newSalaryType" placeholder="類別">
             <input type="text" id="newSalaryNote" placeholder="備註" style="flex-grow:1;">
             <button class="btn" style="background:var(--success);" onclick="submitNewSalary()">新增</button>
@@ -113,13 +163,18 @@
         <thead>
             <tr style="background:#f4f4f4;">
                 <th id="thNameCol" style="display:none; width:100px;">姓名</th>
-                <th style="width:150px;">薪資金額</th><th style="width:100px;">調幅 %</th><th style="width:150px;">生效日期</th>
-                <th style="width:100px;">職等</th><th style="width:120px;">類別</th><th>決策備註</th>
+                <th style="width:150px;">薪資金額</th>
+                <th style="width:100px;">調幅 %</th>
+                <th style="width:150px;">生效日期</th>
+                <th style="width:100px;">職等</th>
+                <th style="width:120px;">類別</th>
+                <th>決策備註</th>
             </tr>
         </thead>
         <tbody id="salaryBody"></tbody>
     </table>
 </div>
+
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
 
@@ -127,68 +182,63 @@ let scoreChart = null;
 let historyCompareChartInstance = null;
 let historyTrendChartInstance = null;
 let isUserTyping = false;
+let timelineData = {};
+let baseResults = {};
 
 window.onload = async () => {
     try {
         const res = await fetch(API_URL);
         const r = await res.json();
         if (r.status === "success") {
-            document.getElementById('selEmp').innerHTML = r.data.map(e => 
+            document.getElementById('selEmp').innerHTML = r.data.map(e =>
                 `<option value="${e.name}" data-rank="${e.rank}" data-salary="${e.salary}">${e.name}</option>`
             ).join('');
             initUI();
         }
-    } catch (e) { 
+    } catch (e) {
         console.error("初始化失敗", e);
         alert("系統初始化失敗，請檢查網路連線或聯繫管理員");
     }
 };
 
-// 💡 修正2: 改善 initUI 函式，確保正確清理與載入
 function initUI() {
     const sel = document.getElementById('selEmp');
     if (!sel || sel.selectedIndex === -1) return;
-    
+
     const opt = sel.options[sel.selectedIndex];
     const rank = (opt.getAttribute('data-rank') || "L1").trim().toUpperCase();
     const salary = opt.getAttribute('data-salary') || 0;
     const isL1 = (rank === 'L1');
-    
-    // 清空薪資表格避免資料殘留
+
     const salaryBody = document.getElementById('salaryBody');
     if (salaryBody) salaryBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 載入中...</td></tr>';
-    
-    // 💡 修正3: 確實銷毀舊圖表實例
+
     if (scoreChart) {
         scoreChart.destroy();
         scoreChart = null;
     }
-    
-    // 初始化時間軸資料
-    timelineData = { 
-        Q1: {r:rank, s:salary}, 
-        Q2: {r:rank, s:salary}, 
-        Q3: {r:rank, s:salary}, 
-        Q4: {r:rank, s:salary} 
+
+    timelineData = {
+        Q1: { r: rank, s: salary },
+        Q2: { r: rank, s: salary },
+        Q3: { r: rank, s: salary },
+        Q4: { r: rank, s: salary }
     };
-    
-    // 動態生成年度評分輸入框
+
     let h1 = '', count = isL1 ? 12 : 4;
-    for(let i=1; i<=count; i++) {
+    for (let i = 1; i <= count; i++) {
         const label = isL1 ? i + '月' : 'Q' + i;
         h1 += `<div class="input-group"><span style="font-weight:bold;">${label}</span><input type="number" class="q-score ann-in" oninput="runLiveCalc()"></div>`;
     }
-    
-    // 專案評分永遠12個月
+
     let h2 = '';
-    for(let i=1; i<=12; i++) {
+    for (let i = 1; i <= 12; i++) {
         h2 += `<div class="input-group"><span>${i}月</span><input type="number" class="q-score prj-in" oninput="runLiveCalc()"></div>`;
     }
-    
+
     document.getElementById('annualInputs').innerHTML = h1;
     document.getElementById('projInputs').innerHTML = h2;
-    
-    // 同時觸發獎金計算與薪資載入
+
     autoCalc(true);
     loadSalaryHistoryLocal();
 }
@@ -198,9 +248,9 @@ function runLiveCalc() {
         const vals = Array.from(document.querySelectorAll(cls))
             .map(i => parseFloat(i.value))
             .filter(v => !isNaN(v) && v > 0);
-        return vals.length > 0 ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : "0.00";
+        return vals.length > 0 ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : "0.00";
     };
-    
+
     document.getElementById('avgSpan').innerText = getAvg('.ann-in');
     document.getElementById('projAvgSpan').innerText = getAvg('.prj-in');
     updateScoreChart();
@@ -209,126 +259,122 @@ function runLiveCalc() {
 
 async function autoCalc(forceSync = false) {
     if (isUserTyping && !forceSync) return;
-    
+
     const payload = {
         action: "calculateBonus",
         empName: document.getElementById('selEmp').value,
         year: document.getElementById('calcYear').value,
-        scores: Array.from(document.querySelectorAll('.ann-in')).map(i => i.value||null),
+        scores: Array.from(document.querySelectorAll('.ann-in')).map(i => i.value || null),
         timeline: timelineData,
         avgScore: document.getElementById('avgSpan').innerText,
         projAvg: document.getElementById('projAvgSpan').innerText
     };
-    
+
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
-        
-        if(r.status === "success") {
-            baseResults = r.data;
-            baseResults.yearConfigs = r.yearConfigs;
-            
-          if (forceSync) {
-    // 年度分數：只塞「數字」或空字串
-    if (r.historyScores && Array.isArray(r.historyScores)) {
-        const annInputs = document.querySelectorAll('.ann-in');
-        r.historyScores.forEach((v, i) => {
-            if (!annInputs[i]) return;
-            const num = parseFloat(v);
-            annInputs[i].value = isNaN(num) ? "" : num;
-        });
-    }
 
-    // 專案分數：只塞「數字」或空字串
-    if (r.historyProjScores && Array.isArray(r.historyProjScores)) {
-        const prjInputs = document.querySelectorAll('.prj-in');
-        r.historyProjScores.forEach((v, i) => {
-            if (!prjInputs[i]) return;
-            const num = parseFloat(v);
-            prjInputs[i].value = isNaN(num) ? "" : num;
-        });
-    }
+        if (r.status === "success") {
+            baseResults = r.data || {};
+            baseResults.yearConfigs = r.yearConfigs || {};
 
-    if (r.historyTimeline) timelineData = r.historyTimeline;
-    runLiveCalc();
-}
+            if (forceSync) {
+                if (r.historyScores && Array.isArray(r.historyScores)) {
+                    const annInputs = document.querySelectorAll('.ann-in');
+                    r.historyScores.forEach((v, i) => {
+                        if (!annInputs[i]) return;
+                        const num = parseFloat(v);
+                        annInputs[i].value = isNaN(num) ? "" : num;
+                    });
+                }
+
+                if (r.historyProjScores && Array.isArray(r.historyProjScores)) {
+                    const prjInputs = document.querySelectorAll('.prj-in');
+                    r.historyProjScores.forEach((v, i) => {
+                        if (!prjInputs[i]) return;
+                        const num = parseFloat(v);
+                        prjInputs[i].value = isNaN(num) ? "" : num;
+                    });
+                }
+
+                if (r.historyTimeline) timelineData = r.historyTimeline;
+                runLiveCalc();
+            }
+
             renderTimelineUI();
             updateAdminTableUI(r.historyAdjs);
             updateHistoryCharts();
         }
-    } catch(e) { 
-        console.error("同步失敗:", e); 
+    } catch (e) {
+        console.error("同步失敗:", e);
     }
 }
 
 function renderTimelineUI() {
     let rH = '<td>職等</td>', sH = '<td>月薪</td>';
-    ['Q1','Q2','Q3','Q4'].forEach(q => {
+    ['Q1', 'Q2', 'Q3', 'Q4'].forEach(q => {
         rH += `<td><select onchange="timelineData['${q}'].r=this.value; runLiveCalc()">
             <option value="L1">L1</option><option value="L2">L2</option>
             <option value="L3">L3</option><option value="L4">L4</option>
         </select></td>`;
-        sH += `<td><input type="number" value="${timelineData[q].s}" 
+        sH += `<td><input type="number" value="${timelineData[q].s}"
             oninput="timelineData['${q}'].s=this.value; updateAdminTableUI()"></td>`;
     });
     document.getElementById('tmRankRow').innerHTML = rH;
     document.getElementById('tmSalaryRow').innerHTML = sH;
-    document.querySelectorAll('#tmRankRow select').forEach((s,i) => s.value = timelineData['Q'+(i+1)].r);
+    document.querySelectorAll('#tmRankRow select').forEach((s, i) => s.value = timelineData['Q' + (i + 1)].r);
 }
 
 function updateAdminTableUI(adjs = null) {
     const rb = document.getElementById('resultBody');
-    const cfg = baseResults.yearConfigs || {};
-    
+    const cfgAll = baseResults.yearConfigs || {};
+
     let html = `<tr>
         <td>${document.getElementById('selEmp').value}</td>
         <td>${document.getElementById('calcYear').value}</td>
         <td>${document.getElementById('avgSpan').innerText}</td>`;
-    
-['f1', 'f2', 'f3', 'ye', 'proj'].forEach((item, i) => {
-    let ref = 0;
-    let adj = 0;
 
-    // 安全地把 adjs 裡的東西轉成數字，不是數字就當 0
-    if (adjs && Array.isArray(adjs)) {
-        if (item === 'proj') {
-            // 專案目前沒有獨立的「調整金額」，先固定 0
-            adj = 0;
-        } else if (item === 'ye') {
-            adj = parseFloat(adjs[3]) || 0; // 對應 history 的 ye_adj
-        } else {
-            adj = parseFloat(adjs[i]) || 0; // f1/f2/f3 對應 0,1,2
+    ['f1', 'f2', 'f3', 'ye', 'proj'].forEach((item, i) => {
+        let ref = 0;
+        let adj = 0;
+
+        if (adjs && Array.isArray(adjs)) {
+            if (item === 'proj') {
+                adj = 0; // 目前不從 historyAdjs 讀專案調整
+            } else if (item === 'ye') {
+                adj = parseFloat(adjs[3]) || 0;
+            } else {
+                adj = parseFloat(adjs[i]) || 0;
+            }
         }
-    }
 
-    if (item === 'proj') {
-        const projAvg = parseFloat(document.getElementById('projAvgSpan').innerText) || 0;
-        const base = adjs ? (parseFloat(adjs[4]) || 80000) : 80000; // history[17] 或預設 80000
-        ref = Math.round(base * getProjectMultiplier_Frontend(projAvg));
-    } else if (item === 'ye') {
-        const q4 = timelineData.Q4;
-        const cfg = baseResults.yearConfigs || {};
-        const yeBase = q4.r === "L1" ? (cfg.L1_Over_1Y || 0.5) : (cfg[q4.r+'_Base'] || 1.0);
-        const avgScore = parseFloat(document.getElementById('avgSpan').innerText) || 0;
-        ref = Math.round(q4.s * yeBase * getPerfMult_Frontend(avgScore, "annual"));
-    } else {
-        const q = timelineData['Q'+(i+1)];
-        const cfg = baseResults.yearConfigs || {};
-        const base = q.r === "L1" ? 0 : (cfg[q.r+'_Base'] || 1.0);
-        const qScore = parseFloat(document.querySelectorAll('.ann-in')[i]?.value) || 0;
-        ref = q.r === "L1" ? (cfg.L1_Fest_Over_6M || 1000) : 
-              Math.round(q.s * 0.25 * base * getPerfMult_Frontend(qScore, "quarterly"));
-    }
+        if (item === 'proj') {
+            const projAvg = parseFloat(document.getElementById('projAvgSpan').innerText) || 0;
+            const base = adjs ? (parseFloat(adjs[4]) || 80000) : 80000;
+            ref = Math.round(base * getProjectMultiplier_Frontend(projAvg));
+        } else if (item === 'ye') {
+            const q4 = timelineData.Q4;
+            const yeBase = q4.r === "L1" ? (cfgAll.L1_Over_1Y || 0.5) : (cfgAll[q4.r + '_Base'] || 1.0);
+            const avgScore = parseFloat(document.getElementById('avgSpan').innerText) || 0;
+            ref = Math.round(q4.s * yeBase * getPerfMult_Frontend(avgScore, "annual"));
+        } else {
+            const q = timelineData['Q' + (i + 1)];
+            const base = q.r === "L1" ? 0 : (cfgAll[q.r + '_Base'] || 1.0);
+            const qScore = parseFloat(document.querySelectorAll('.ann-in')[i]?.value) || 0;
+            ref = q.r === "L1"
+                ? (cfgAll.L1_Fest_Over_6M || 1000)
+                : Math.round(q.s * 0.25 * base * getPerfMult_Frontend(qScore, "quarterly"));
+        }
 
-    const finalValue = ref + adj; // 一定是數字
+        const finalValue = ref + adj;
 
-    html += `<td>
-        <span class="reference-text">參考:${ref.toLocaleString()}</span>
-        <input type="number" class="target-input" id="target_${item}" 
-               value="${finalValue}" oninput="refreshTotal()">
-    </td>`;
-});
-    
+        html += `<td>
+            <span class="reference-text">參考:${ref.toLocaleString()}</span>
+            <input type="number" class="target-input" id="target_${item}"
+                   value="${finalValue}" oninput="refreshTotal()">
+        </td>`;
+    });
+
     html += `<td id="totalCell" class="total-cell">0</td></tr>`;
     rb.innerHTML = html;
     refreshTotal();
@@ -336,7 +382,7 @@ function updateAdminTableUI(adjs = null) {
 
 function refreshTotal() {
     let t = 0;
-    ['target_f1','target_f2','target_f3','target_ye','target_proj'].forEach(id => {
+    ['target_f1', 'target_f2', 'target_f3', 'target_ye', 'target_proj'].forEach(id => {
         t += parseFloat(document.getElementById(id)?.value || 0);
     });
     document.getElementById('totalCell').innerText = t.toLocaleString();
@@ -345,23 +391,23 @@ function refreshTotal() {
 async function askPassword() {
     const pwd = prompt("主管授權密碼");
     if (!pwd) return;
-    
+
     try {
-        const res = await fetch(API_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ action: "verifyAdmin", password: pwd }) 
+        const res = await fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "verifyAdmin", password: pwd })
         });
         const r = await res.json();
-        
-        if(r.status === "success") { 
-            document.getElementById('adminZone').style.display = 'block'; 
-            document.getElementById('unlockBtn').innerText = "🔓 已授權"; 
-            autoCalc(false); 
+
+        if (r.status === "success") {
+            document.getElementById('adminZone').style.display = 'block';
+            document.getElementById('unlockBtn').innerText = "🔓 已授權";
+            autoCalc(false);
         } else {
             alert("密碼錯誤");
         }
-    } catch(e) { 
-        alert("連線失敗"); 
+    } catch (e) {
+        alert("連線失敗");
     }
 }
 
@@ -369,11 +415,11 @@ async function openReport(mode) {
     const inner = document.getElementById('reportInner');
     const name = document.getElementById('selEmp').value;
     const payload = { action: "getHistoryComparison", empName: (mode === 'all' ? "" : name) };
-    
+
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
-        
+
         if (r.status === "success" && r.history.length > 0) {
             if (mode === 'all') {
                 const grouped = r.history.reduce((acc, curr) => {
@@ -382,7 +428,6 @@ async function openReport(mode) {
                     return acc;
                 }, {});
 
-                // 💡 修正：增加人名表頭與強制換頁
                 inner.innerHTML = Object.keys(grouped).sort().map(pName => `
                     <div class="report-page" style="page-break-after: always; padding: 20px; border-bottom: 2px solid #eee;">
                         <h2 style="text-align:center;">${pName} - 歷年獎金明細總結表</h2>
@@ -392,8 +437,11 @@ async function openReport(mode) {
                                 ${grouped[pName].map(h => `
                                     <tr>
                                         <td style="text-align:center;">${h.year}</td>
-                                        <td>${h.f1.toLocaleString()}</td><td>${h.f2.toLocaleString()}</td><td>${h.f3.toLocaleString()}</td>
-                                        <td>${h.ye.toLocaleString()}</td><td>${h.proj.toLocaleString()}</td>
+                                        <td>${h.f1.toLocaleString()}</td>
+                                        <td>${h.f2.toLocaleString()}</td>
+                                        <td>${h.f3.toLocaleString()}</td>
+                                        <td>${h.ye.toLocaleString()}</td>
+                                        <td>${h.proj.toLocaleString()}</td>
                                         <td style="font-weight:bold; background:#fff3cd;">${h.total.toLocaleString()}</td>
                                     </tr>
                                 `).join('')}
@@ -401,122 +449,134 @@ async function openReport(mode) {
                         </table>
                     </div>`).join('');
             } else {
-                // 個人報表邏輯...
+                // 個人報表可以依需求補上
             }
             document.getElementById('reportModal').style.display = 'block';
         }
-    } catch (err) { alert("報表生成失敗"); }
+    } catch (err) {
+        alert("報表生成失敗");
+    }
+}
+
+function printBonusReport() {
+    document.body.classList.add('print-bonus');
+    document.body.classList.remove('print-salary');
+
+    window.print();
+
+    setTimeout(() => {
+        document.body.classList.remove('print-bonus');
+    }, 500);
 }
 
 function renderPersonalCharts(data) {
-    const last = data[data.length-1];
-    new Chart(document.getElementById('printPieChart'), { 
-        type:'pie', 
-        data:{ 
-            labels:['五一','端午','中秋','年終','專案'], 
-            datasets:[{
-                data:[last.f1, last.f2, last.f3, last.ye, last.proj], 
-                backgroundColor:['#3498db','#2980b9','#1f618d','#27ae60','#e67e22']
-            }] 
-        } 
+    const last = data[data.length - 1];
+    new Chart(document.getElementById('printPieChart'), {
+        type: 'pie',
+        data: {
+            labels: ['五一', '端午', '中秋', '年終', '專案'],
+            datasets: [{
+                data: [last.f1, last.f2, last.f3, last.ye, last.proj],
+                backgroundColor: ['#3498db', '#2980b9', '#1f618d', '#27ae60', '#e67e22']
+            }]
+        }
     });
-    
-    new Chart(document.getElementById('printLineChart'), { 
-        type:'line', 
-        data:{ 
-            labels:data.map(d=>d.year), 
-            datasets:[{
-                label:'年度總獎金', 
-                data:data.map(d=>d.total), 
-                borderColor:'#e74c3c'
-            }] 
-        } 
+
+    new Chart(document.getElementById('printLineChart'), {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.year),
+            datasets: [{
+                label: '年度總獎金',
+                data: data.map(d => d.total),
+                borderColor: '#e74c3c'
+            }]
+        }
     });
 }
 
 async function updateHistoryCharts() {
     try {
-        const res = await fetch(API_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ 
-                action: "getHistoryComparison", 
-                empName: document.getElementById('selEmp').value 
-            }) 
+        const res = await fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({
+                action: "getHistoryComparison",
+                empName: document.getElementById('selEmp').value
+            })
         });
         const r = await res.json();
-        
-        if(r.status === "success" && r.history.length > 0) {
+
+        if (r.status === "success" && r.history.length > 0) {
             const sorted = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
             const labels = sorted.map(d => d.year + '年');
-            
-            // 💡 修正6: 確實銷毀舊圖表
+
             const ctx1 = document.getElementById('historyCompareChart').getContext('2d');
-            if(historyCompareChartInstance) {
+            if (historyCompareChartInstance) {
                 historyCompareChartInstance.destroy();
             }
-            
+
             historyCompareChartInstance = new Chart(ctx1, {
                 type: 'bar',
-                data: { 
-                    labels: labels, 
+                data: {
+                    labels: labels,
                     datasets: [
                         { label: '五一', data: sorted.map(d => d.f1), backgroundColor: '#3498db' },
                         { label: '端午', data: sorted.map(d => d.f2), backgroundColor: '#2980b9' },
                         { label: '中秋', data: sorted.map(d => d.f3), backgroundColor: '#1f618d' },
                         { label: '年終', data: sorted.map(d => d.ye), backgroundColor: '#27ae60' },
                         { label: '專案', data: sorted.map(d => d.proj), backgroundColor: '#e67e22' }
-                    ] 
+                    ]
                 },
-                options: { 
-                    maintainAspectRatio: false, 
-                    scales: { x: { stacked: true }, y: { stacked: true } }, 
-                    plugins: { 
-                        datalabels: { 
-                            display: true, 
-                            align: 'top', 
-                            formatter: (v, ctx) => ctx.datasetIndex === 4 ? 
-                                sorted[ctx.dataIndex].total.toLocaleString() : null 
-                        } 
-                    } 
+                options: {
+                    maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true } },
+                    plugins: {
+                        datalabels: {
+                            display: true,
+                            align: 'top',
+                            formatter: (v, ctx) =>
+                                ctx.datasetIndex === 4 ? sorted[ctx.dataIndex].total.toLocaleString() : null
+                        }
+                    }
                 }
             });
-            
+
             renderTrendChart(labels, sorted.map(d => Number(d.total || 0)));
         }
-    } catch (e) { 
-        console.error("圖表更新失敗:", e); 
+    } catch (e) {
+        console.error("圖表更新失敗:", e);
     }
 }
 
 function renderTrendChart(labels, data) {
     const ctx2 = document.getElementById('historyTrendChart').getContext('2d');
-    if(historyTrendChartInstance) {
+    if (historyTrendChartInstance) {
         historyTrendChartInstance.destroy();
     }
-    
-    historyTrendChartInstance = new Chart(ctx2, { 
-        type: 'line', 
-        data: { 
-            labels: labels, 
+
+    historyTrendChartInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+            labels: labels,
             datasets: [{
-                label: '總獎金趨勢', 
-                data: data, 
-                borderColor: '#e74c3c', 
-                borderWidth: 3, 
-                fill: false, 
-                tension: 0.1, 
-                pointRadius: 6 
-            }] 
-        }, 
-        options: { 
-            maintainAspectRatio: false, 
-            plugins: { 
-                datalabels: { 
-                    display: true, 
-                    formatter: v => v.toLocaleString() 
-                } 
-            } 
-        } 
+                label: '總獎金趨勢',
+                data: data,
+                borderColor: '#e74c3c',
+                borderWidth: 3,
+                fill: false,
+                tension: 0.1,
+                pointRadius: 6
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                datalabels: {
+                    display: true,
+                    formatter: v => v.toLocaleString()
+                }
+            }
+        }
     });
 }
 
@@ -524,32 +584,32 @@ async function loadSalaryHistoryLocal() {
     const name = document.getElementById('selEmp').value;
     const body = document.getElementById('salaryBody');
     const targetName = document.getElementById('salaryTargetName');
-    
+
     if (targetName) targetName.innerText = name;
     if (!body) return;
-    
+
     try {
-        const res = await fetch(API_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
+        const res = await fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "getSalaryHistory", empName: name })
         });
-        
+
         if (!res.ok) throw new Error(`HTTP 錯誤! 狀態: ${res.status}`);
         const r = await res.json();
-        
+
         if (r.status === "success" && r.history && r.history.length > 0) {
             let sorted = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
-            
+
             body.innerHTML = sorted.map((h, i) => {
                 let diffText = "-";
                 if (i > 0) {
-                    const prevAmount = sorted[i-1].amount;
+                    const prevAmount = sorted[i - 1].amount;
                     if (prevAmount > 0) {
                         const d = ((h.amount - prevAmount) / prevAmount * 100);
                         diffText = (d > 0 ? "+" : "") + d.toFixed(1) + "%";
                     }
                 }
-                
+
                 return `
                     <tr>
                         <td class="name-td" style="display:none; text-align:center;">${name}</td>
@@ -571,37 +631,37 @@ async function loadSalaryHistoryLocal() {
 }
 
 async function submitNewSalary() {
-    const data = { 
-        action: "addSalaryHistory", 
-        empName: document.getElementById('selEmp').value, 
-        date: document.getElementById('newSalaryDate').value, 
-        amount: document.getElementById('newSalaryAmount').value, 
-        rank: document.getElementById('newSalaryRank').value, 
-        type: document.getElementById('newSalaryType').value, 
-        note: document.getElementById('newSalaryNote').value 
+    const data = {
+        action: "addSalaryHistory",
+        empName: document.getElementById('selEmp').value,
+        date: document.getElementById('newSalaryDate').value,
+        amount: document.getElementById('newSalaryAmount').value,
+        rank: document.getElementById('newSalaryRank').value,
+        type: document.getElementById('newSalaryType').value,
+        note: document.getElementById('newSalaryNote').value
     };
-    
-    if(!data.date || !data.amount) return alert("日期金額必填");
-    
+
+    if (!data.date || !data.amount) return alert("日期金額必填");
+
     const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
     const r = await res.json();
-    
-    if(r.status === "success") { 
-        alert("新增成功"); 
-        loadSalaryHistoryLocal(); 
+
+    if (r.status === "success") {
+        alert("新增成功");
+        loadSalaryHistoryLocal();
     }
 }
 
 async function printSalary(mode) {
     if (mode === 'all') {
         document.getElementById('thNameCol').style.display = 'table-cell';
-        const res = await fetch(API_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ action: "getAllSalaryHistory" }) 
+        const res = await fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "getAllSalaryHistory" })
         });
         const r = await res.json();
-        const sorted = r.data.sort((a,b) => a.name.localeCompare(b.name) || new Date(a.date) - new Date(b.date));
-        
+        const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name) || new Date(a.date) - new Date(b.date));
+
         document.getElementById('salaryBody').innerHTML = sorted.map(h => `
             <tr>
                 <td class="name-td">${h.name}</td>
@@ -616,29 +676,36 @@ async function printSalary(mode) {
     } else {
         await loadSalaryHistoryLocal();
     }
-    
-    setTimeout(() => { 
-        window.print(); 
-        if(mode === 'all') loadSalaryHistoryLocal(); 
+
+    setTimeout(() => {
+        document.body.classList.add('print-salary');
+        document.body.classList.remove('print-bonus');
+
+        window.print();
+
+        setTimeout(() => {
+            document.body.classList.remove('print-salary');
+            if (mode === 'all') loadSalaryHistoryLocal();
+        }, 500);
     }, 500);
 }
 
 function switchTab(tab) {
     const sp = document.getElementById('salaryPage');
-    if (tab === 'salary') { 
-        sp.style.display = 'block'; 
-        loadSalaryHistoryLocal(); 
-        sp.scrollIntoView({ behavior: 'smooth' }); 
-    } else { 
-        sp.style.display = 'none'; 
-        window.scrollTo({ top: 0, behavior: 'smooth' }); 
+    if (tab === 'salary') {
+        sp.style.display = 'block';
+        loadSalaryHistoryLocal();
+        sp.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        sp.style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
 function updateScoreChart() {
     const ctx = document.getElementById('scoreChart').getContext('2d');
     if (scoreChart) scoreChart.destroy();
-    
+
     const labels = Array.from(document.querySelectorAll('#annualInputs span')).map(el => el.innerText);
     const annData = Array.from(document.querySelectorAll('.ann-in'))
         .map(i => parseFloat(i.value))
@@ -646,41 +713,40 @@ function updateScoreChart() {
     const prjData = Array.from(document.querySelectorAll('.prj-in'))
         .map(i => parseFloat(i.value))
         .filter(v => !isNaN(v));
-    
-    scoreChart = new Chart(ctx, { 
-        type: 'line', 
-        data: { 
-            labels: labels, 
+
+    scoreChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
             datasets: [
-                { 
-                    label: '年度評分', 
-                    data: annData, 
-                    borderColor: '#3498db', 
-                    fill: false 
-                }, 
-                { 
-                    label: '專案評分', 
-                    data: prjData, 
-                    borderColor: '#e67e22', 
-                    borderDash: [5, 5], 
-                    fill: false 
+                {
+                    label: '年度評分',
+                    data: annData,
+                    borderColor: '#3498db',
+                    fill: false
+                },
+                {
+                    label: '專案評分',
+                    data: prjData,
+                    borderColor: '#e67e22',
+                    borderDash: [5, 5],
+                    fill: false
                 }
-            ] 
-        }, 
-        options: { 
-            maintainAspectRatio: false, 
-            plugins: { 
-                datalabels: { 
-                    display: true, 
-                    align: 'top', 
-                    formatter: v => v 
-                } 
-            } 
-        } 
+            ]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                datalabels: {
+                    display: true,
+                    align: 'top',
+                    formatter: v => v
+                }
+            }
+        }
     });
 }
 
-// 💡 修正7: 新增儲存功能
 async function saveCurrentData() {
     const payload = {
         action: "saveRecord",
@@ -703,25 +769,25 @@ async function saveCurrentData() {
         projScores: Array.from(document.querySelectorAll('.prj-in')).map(i => parseFloat(i.value) || 0),
         proj_adj: parseFloat(document.getElementById('target_proj')?.value || 0) - 80000
     };
-    
+
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
-        if(r.status === "success") {
+        if (r.status === "success") {
             alert('✅ 數據已成功儲存至雲端');
         } else {
             alert('❌ 儲存失敗: ' + (r.msg || '未知錯誤'));
         }
-    } catch(e) {
+    } catch (e) {
         alert('❌ 網路錯誤，請稍後再試');
         console.error(e);
     }
 }
 
-function getPerfMult_Frontend(s, type) { 
-    s = parseFloat(s); 
-    if (isNaN(s) || s <= 0) return 0; 
-    
+function getPerfMult_Frontend(s, type) {
+    s = parseFloat(s);
+    if (isNaN(s) || s <= 0) return 0;
+
     if (type === "quarterly") {
         if (s >= 90) return 1.2;
         if (s >= 80) return 1.0;
@@ -729,7 +795,7 @@ function getPerfMult_Frontend(s, type) {
         if (s >= 60) return 0.7;
         return 0.5;
     }
-    
+
     if (s >= 90) return 1.5;
     if (s >= 80) return 1.3;
     if (s >= 70) return 1.0;
@@ -738,13 +804,13 @@ function getPerfMult_Frontend(s, type) {
 }
 
 function getProjectMultiplier_Frontend(s) {
-    s = parseFloat(s); 
+    s = parseFloat(s);
     if (isNaN(s) || s <= 0) return 0;
-    
-    if (s >= 90) return 1.0; 
-    if (s >= 80) return 0.8; 
-    if (s >= 70) return 0.6; 
-    if (s >= 60) return 0.4; 
+
+    if (s >= 90) return 1.0;
+    if (s >= 80) return 0.8;
+    if (s >= 70) return 0.6;
+    if (s >= 60) return 0.4;
     return 0.2;
 }
 </script>
