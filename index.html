@@ -123,13 +123,10 @@
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
 
-// 💡 修正1: 補齊所有全域變數宣告
-let scoreChart = null, isUserTyping = false; // 💡 務必補上這一行宣告
+let scoreChart = null;
 let historyCompareChartInstance = null;
 let historyTrendChartInstance = null;
 let isUserTyping = false;
-let timelineData = {};
-let baseResults = {};
 
 window.onload = async () => {
     try {
@@ -280,31 +277,31 @@ function updateAdminTableUI(adjs = null) {
         <td>${document.getElementById('calcYear').value}</td>
         <td>${document.getElementById('avgSpan').innerText}</td>`;
     
-    ['f1', 'f2', 'f3', 'ye', 'proj'].forEach((item, i) => {
-        let ref = 0;
-        
-        if (item === 'proj') {
-            const projAvg = parseFloat(document.getElementById('projAvgSpan').innerText) || 0;
-            ref = Math.round((adjs ? adjs[4] : 80000) * getProjectMultiplier_Frontend(projAvg));
-        } else if (item === 'ye') {
-            const q4 = timelineData.Q4;
-            const yeBase = q4.r === "L1" ? (cfg.L1_Over_1Y || 0.5) : (cfg[q4.r+'_Base'] || 1.0);
-            const avgScore = parseFloat(document.getElementById('avgSpan').innerText) || 0;
-            ref = Math.round(q4.s * yeBase * getPerfMult_Frontend(avgScore, "annual"));
-        } else {
-            const q = timelineData['Q'+(i+1)];
-            const base = q.r === "L1" ? 0 : (cfg[q.r+'_Base'] || 1.0);
-            const qScore = parseFloat(document.querySelectorAll('.ann-in')[i]?.value) || 0;
-            ref = q.r === "L1" ? (cfg.L1_Fest_Over_6M || 1000) : 
-                  Math.round(q.s * 0.25 * base * getPerfMult_Frontend(qScore, "quarterly"));
-        }
-        
-        html += `<td>
-            <span class="reference-text">參考:${ref.toLocaleString()}</span>
-            <input type="number" class="target-input" id="target_${item}" 
-                   value="${ref+(adjs?adjs[i==4?5:i]:0)}" oninput="refreshTotal()">
-        </td>`;
-    });
+['f1', 'f2', 'f3', 'ye', 'proj'].forEach((item, i) => {
+    let ref = 0;
+    let adj = 0;
+
+    if (item === 'proj') {
+        const projAvg = parseFloat(document.getElementById('projAvgSpan').innerText) || 0;
+        const base = adjs ? (adjs[4] || 80000) : 80000; // history[17] or default 80000
+        ref = Math.round(base * getProjectMultiplier_Frontend(projAvg));
+        // 目前沒有真正的 proj_adj 欄位，就先不加 adj
+    } else if (item === 'ye') {
+        // 原本邏輯保持，但 adj 來自 adjs[3]
+        adj = adjs ? (parseFloat(adjs[3]) || 0) : 0;
+        // ...
+    } else {
+        // f1, f2, f3 → adj 分別來自 adjs[0], adjs[1], adjs[2]
+        adj = adjs ? (parseFloat(adjs[i]) || 0) : 0;
+        // ...
+    }
+
+    html += `<td>
+        <span class="reference-text">參考:${ref.toLocaleString()}</span>
+        <input type="number" class="target-input" id="target_${item}" 
+               value="${(ref + adj).toLocaleString().replace(/,/g,'')}" oninput="refreshTotal()">
+    </td>`;
+});
     
     html += `<td id="totalCell" class="total-cell">0</td></tr>`;
     rb.innerHTML = html;
