@@ -127,9 +127,12 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
-    let scoreChart=null, historyCompareChartInstance=null, historyTrendChartInstance=null, timelineData={}, baseResults={};
-    Chart.register(ChartDataLabels);
+   const API_URL = "https://script.google.com/macros/s/AKfycbwEsRGGnWkjYamqhhYwO1aQ7GKSxw72uubXcOuJ--YBDFvqqgqi-JeiKn0auWYHMKNTdQ/exec";
+let scoreChart = null, historyCompareChartInstance = null, historyTrendChartInstance = null;
+let timelineData = {}, baseResults = {};
+
+// 💡 補上這一行定義
+let isUserTyping = false;
 
     window.onload = async () => {
         try {
