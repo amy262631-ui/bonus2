@@ -402,111 +402,57 @@ async function loadSalaryHistoryLocal() {
     const name = document.getElementById('selEmp').value;
     const body = document.getElementById('salaryBody');
     document.getElementById('salaryTargetName').innerText = name;
-    if(!body) return;
-    
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">🔍 資料載入中...</td></tr>';
+
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
         const r = await res.json();
         
-        if (r.status === "success" && r.history && r.history.length > 0) {
-            // 💡 1. 按日期「由舊到新」排序
-            let sortedData = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+        if (r.status === "success" && r.history.length > 0) {
+            // 💡 排序：舊到新 (2022 -> 2025)
+            let sorted = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
             
-            // 💡 2. 計算調幅
-            let historyWithPercent = sortedData.map((h, i) => {
-                let diffText = "-";
-                if (i > 0 && sortedData[i-1].amount > 0) {
-                    const diff = ((h.amount - sortedData[i-1].amount) / sortedData[i-1].amount) * 100;
-                    diffText = (diff > 0 ? "+" : "") + diff.toFixed(1) + "%";
+            body.innerHTML = sorted.map((h, i) => {
+                let diff = "-";
+                if (i > 0) {
+                    const d = ((h.amount - sorted[i-1].amount) / sorted[i-1].amount * 100);
+                    diff = (d > 0 ? "+" : "") + d.toFixed(1) + "%";
                 }
-                return { ...h, percent: diffText };
-            });
-
-            // 💡 3. 渲染 7 個欄位 (姓名, 金額, 調幅, 日期, 職等, 類別, 備註)
-            body.innerHTML = historyWithPercent.map(h => `
-                <tr>
-                    <td class="name-col" style="display:none; text-align:center;">${name}</td>
-                    <td style="font-weight:bold; color:var(--success); text-align:right;">$${Number(h.amount).toLocaleString()}</td>
-                    <td style="text-align:center; color: #d35400; font-weight: bold;">${h.percent}</td>
+                // 💡 確保這裡有 7 個 <td>
+                return `<tr>
+                    <td class="name-td" style="display:none; text-align:center;">${name}</td>
+                    <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
+                    <td style="text-align:center; color:#d35400;">${diff}</td>
                     <td style="text-align:center;">${h.date}</td>
                     <td style="text-align:center;">${h.rank}</td>
                     <td style="text-align:center;">${h.type || '-'}</td>
-                    <td style="text-align:left;">${h.note || '-'}</td>
-                </tr>
-            `).join('');
-        } else {
-            body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">暫無紀錄</td></tr>';
+                    <td>${h.note || '-'}</td>
+                </tr>`;
+            }).join('');
         }
-    } catch (e) {
-        body.innerHTML = '<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">連線失敗</td></tr>';
-    }
+    } catch (e) { console.error(e); }
 }
 
-    async function submitNewSalary() {
-        const data = {
-            action: "addSalaryHistory",
-            empName: document.getElementById('selEmp').value,
-            date: document.getElementById('newSalaryDate').value,
-            amount: document.getElementById('newSalaryAmount').value,
-            rank: document.getElementById('newSalaryRank').value,
-            type: document.getElementById('newSalaryType').value,
-            note: document.getElementById('newSalaryNote').value
-        };
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
-        const r = await res.json();
-        if(r.status === "success") { alert("新增成功"); loadSalaryHistoryLocal(); }
-    }
-
 async function printSalary(mode) {
-    const nameSpan = document.getElementById('salaryTargetName');
-    const nameCol = document.getElementById('thNameCol'); // 標題的姓名欄
-    const body = document.getElementById('salaryBody');
-
+    const nameCol = document.getElementById('thNameCol');
     if (mode === 'all') {
-        nameSpan.innerText = "全體人員薪資變動清冊";
-        if (nameCol) nameCol.style.display = 'table-cell'; // 💡 顯示標題姓名欄
+        nameCol.style.display = 'table-cell';
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getAllSalaryHistory" }) });
+        const r = await res.json();
+        const sortedAll = r.data.sort((a,b) => a.name.localeCompare(b.name) || new Date(a.date) - new Date(b.date));
         
-        try {
-            const res = await fetch(API_URL, { 
-                method: "POST", 
-                body: JSON.stringify({ action: "getAllSalaryHistory" }) 
-            });
-            const r = await res.json();
-            if(r.status === "success") {
-                // 💡 關鍵排序：按人員姓名 + 日期(舊到新) 排序
-                const sortedAll = r.data.sort((a, b) => {
-                    if (a.name !== b.name) return a.name.localeCompare(b.name);
-                    return new Date(a.date) - new Date(b.date);
-                });
-
-                // 💡 確保這裡輸出的 <td> 數量與 <thead> 的 <th> 數量完全一致 (共7格)
-                body.innerHTML = sortedAll.map(h => `
-                    <tr>
-                        <td style="text-align:center;">${h.name}</td>
-                        <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
-                        <td style="text-align:center;">-</td> <td style="text-align:center;">${h.date}</td>
-                        <td style="text-align:center;">${h.rank}</td>
-                        <td style="text-align:center;">${h.type || '-'}</td>
-                        <td style="text-align:left;">${h.note || '-'}</td>
-                    </tr>
-                `).join('');
-            }
-        } catch(e) {
-            alert("讀取全體資料失敗");
-            return;
-        }
-    } else {
-        // 個人模式：隱藏姓名欄 (維持原本邏輯)
-        if (nameCol) nameCol.style.display = 'none';
-        await loadSalaryHistoryLocal(); // 確保個人模式是舊到新
+        document.getElementById('salaryBody').innerHTML = sortedAll.map(h => `
+            <tr>
+                <td class="name-td" style="text-align:center;">${h.name}</td>
+                <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
+                <td style="text-align:center;">-</td>
+                <td style="text-align:center;">${h.date}</td>
+                <td style="text-align:center;">${h.rank}</td>
+                <td style="text-align:center;">${h.type || '-'}</td>
+                <td>${h.note || '-'}</td>
+            </tr>
+        `).join('');
     }
-
-    // 💡 執行列印
-    setTimeout(() => { 
-        window.print(); 
-        if(mode === 'all') loadSalaryHistoryLocal(); 
-    }, 500);
+    setTimeout(() => { window.print(); if(mode === 'all') loadSalaryHistoryLocal(); }, 500);
 }
 
     function getPerfMult_Frontend(s, type) {
