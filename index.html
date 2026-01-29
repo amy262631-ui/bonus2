@@ -29,7 +29,12 @@
     .excel-report { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
     .excel-report th, .excel-report td { border: 1px solid #000; padding: 12px; font-size: 18px; }
     .excel-report th { background: #e8e8e8; }
-    
+        
+    @media print {
+    #salaryPage { width: 100% !important; border: none !important; box-shadow: none !important; }
+    .excel-report { width: 100% !important; table-layout: auto !important; }
+    .name-col { display: table-cell !important; } /* 列印時強制顯示姓名 */
+}
     @media print {
         body * { visibility: hidden; }
         #reportModal, #reportModal *, #salaryPage, #salaryPage * { visibility: visible; }
@@ -373,51 +378,46 @@
 
 async function loadSalaryHistoryLocal() {
     const name = document.getElementById('selEmp').value;
-    const targetName = document.getElementById('salaryTargetName');
-    if(targetName) targetName.innerText = name;
     const body = document.getElementById('salaryBody');
+    document.getElementById('salaryTargetName').innerText = name;
     if(!body) return;
     
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 資料載入中...</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">🔍 資料載入中...</td></tr>';
     try {
-        const res = await fetch(API_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ action: "getSalaryHistory", empName: name }) 
-        });
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getSalaryHistory", empName: name }) });
         const r = await res.json();
         
         if (r.status === "success" && r.history && r.history.length > 0) {
-            // 💡 1. 關鍵排序：按日期「由舊到新」排序 (2022 -> 2023 -> 2024 -> 2025)
+            // 💡 1. 按日期「由舊到新」排序
             let sortedData = [...r.history].sort((a, b) => new Date(a.date) - new Date(b.date));
             
-            // 💡 2. 計算調幅百分比 (拿目前的金額跟上一筆比)
+            // 💡 2. 計算調幅
             let historyWithPercent = sortedData.map((h, i) => {
                 let diffText = "-";
-                if (i > 0) {
-                    const prevAmount = sortedData[i-1].amount;
-                    if (prevAmount > 0) {
-                        const diff = ((h.amount - prevAmount) / prevAmount) * 100;
-                        diffText = diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`;
-                    }
+                if (i > 0 && sortedData[i-1].amount > 0) {
+                    const diff = ((h.amount - sortedData[i-1].amount) / sortedData[i-1].amount) * 100;
+                    diffText = (diff > 0 ? "+" : "") + diff.toFixed(1) + "%";
                 }
                 return { ...h, percent: diffText };
             });
 
-            // 💡 3. 渲染畫面：直接按順序輸出，不再 reverse()
+            // 💡 3. 渲染 7 個欄位 (姓名, 金額, 調幅, 日期, 職等, 類別, 備註)
             body.innerHTML = historyWithPercent.map(h => `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="font-weight:bold; color:var(--success); text-align:right; padding:15px;">$${Number(h.amount).toLocaleString()}</td>
+                <tr>
+                    <td class="name-col" style="display:none; text-align:center;">${name}</td>
+                    <td style="font-weight:bold; color:var(--success); text-align:right;">$${Number(h.amount).toLocaleString()}</td>
                     <td style="text-align:center; color: #d35400; font-weight: bold;">${h.percent}</td>
                     <td style="text-align:center;">${h.date}</td>
                     <td style="text-align:center;">${h.rank}</td>
-                    <td style="text-align:center;">${h.type || '-'}</td> <td style="text-align:left; padding:15px;">${h.note || '-'}</td> </tr>
+                    <td style="text-align:center;">${h.type || '-'}</td>
+                    <td style="text-align:left;">${h.note || '-'}</td>
+                </tr>
             `).join('');
         } else {
-            body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">查無調薪紀錄</td></tr>';
+            body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">暫無紀錄</td></tr>';
         }
     } catch (e) {
-        console.error("載入失敗:", e);
-        body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:red;">❌ 連線失敗，請檢查 API 部署。</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">連線失敗</td></tr>';
     }
 }
 
