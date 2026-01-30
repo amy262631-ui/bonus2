@@ -760,38 +760,51 @@ function updateScoreChart() {
 }
 
 async function saveCurrentData() {
+    const currentRank = timelineData.Q4.r; // 取得最新職等
+    const isL1 = (currentRank === "L1");
+
+    // 取得畫面上顯示的各項金額
+    const f1_val = parseFloat(document.getElementById('target_f1')?.value || 0);
+    const f2_val = parseFloat(document.getElementById('target_f2')?.value || 0);
+    const f3_val = parseFloat(document.getElementById('target_f3')?.value || 0);
+    const ye_val = parseFloat(document.getElementById('target_ye')?.value || 0);
+    // 💡 如果是 L1，專案獎金強制為 0，否則取輸入框的值
+    const proj_val = isL1 ? 0 : parseFloat(document.getElementById('target_proj')?.value || 0);
+
     const payload = {
         action: "saveRecord",
         empName: document.getElementById('selEmp').value,
         year: document.getElementById('calcYear').value,
-        rank: timelineData.Q4.r,
+        rank: currentRank,
         avgScore: document.getElementById('avgSpan').innerText,
         f1_base: baseResults.f1 || 0,
         f2_base: baseResults.f2 || 0,
         f3_base: baseResults.f3 || 0,
         ye_base: baseResults.ye || 0,
-        total: parseFloat(document.getElementById('totalCell')?.innerText.replace(/,/g, '') || 0),
+        // 💡 重新計算正確總額，確保儲存到雲端的 Total 沒錯
+        total: f1_val + f2_val + f3_val + ye_val + proj_val,
         scores: Array.from(document.querySelectorAll('.ann-in')).map(i => i.value || null),
         timeline: timelineData,
-        f1_adj: parseFloat(document.getElementById('target_f1')?.value || 0) - (baseResults.f1 || 0),
-        f2_adj: parseFloat(document.getElementById('target_f2')?.value || 0) - (baseResults.f2 || 0),
-        f3_adj: parseFloat(document.getElementById('target_f3')?.value || 0) - (baseResults.f3 || 0),
-        ye_adj: parseFloat(document.getElementById('target_ye')?.value || 0) - (baseResults.ye || 0),
-        proj_final_base: 80000,
+        f1_adj: f1_val - (baseResults.f1 || 0),
+        f2_adj: f2_val - (baseResults.f2 || 0),
+        f3_adj: f3_val - (baseResults.f3 || 0),
+        ye_adj: ye_val - (baseResults.ye || 0),
+        proj_final_base: isL1 ? 0 : 80000, // 💡 L1 基數設為 0
         projScores: Array.from(document.querySelectorAll('.prj-in')).map(i => parseFloat(i.value) || 0),
-        proj_adj: parseFloat(document.getElementById('target_proj')?.value || 0) - 80000
+        proj_adj: proj_val - (isL1 ? 0 : 80000) // 💡 L1 調整額設為 0
     };
 
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
         if (r.status === "success") {
-            alert('✅ 數據已成功儲存至雲端');
+            alert('✅ 數據已成功儲存至雲端（L1專案獎金已自動排除）');
+            autoCalc(false); // 儲存後重整數據
         } else {
             alert('❌ 儲存失敗: ' + (r.msg || '未知錯誤'));
         }
     } catch (e) {
-        alert('❌ 網路錯誤，請稍後再試');
+        alert('❌ 網路錯誤');
         console.error(e);
     }
 }
