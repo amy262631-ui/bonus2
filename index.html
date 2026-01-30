@@ -324,10 +324,10 @@ function renderTimelineUI() {
     document.getElementById('tmSalaryRow').innerHTML = sH;
     document.querySelectorAll('#tmRankRow select').forEach((s, i) => s.value = timelineData['Q' + (i + 1)].r);
 }
-
 function updateAdminTableUI(adjs = null) {
     const rb = document.getElementById('resultBody');
     const cfgAll = baseResults.yearConfigs || {};
+    const currentEmpRank = timelineData.Q4.r; // 取得當前人員職等
 
     let html = `<tr>
         <td>${document.getElementById('selEmp').value}</td>
@@ -338,9 +338,10 @@ function updateAdminTableUI(adjs = null) {
         let ref = 0;
         let adj = 0;
 
+        // 讀取歷史調整額
         if (adjs && Array.isArray(adjs)) {
             if (item === 'proj') {
-                adj = 0; // 目前不從 historyAdjs 讀專案調整
+                adj = parseFloat(adjs[5]) || 0; // 對應後端 S 欄位置
             } else if (item === 'ye') {
                 adj = parseFloat(adjs[3]) || 0;
             } else {
@@ -348,10 +349,21 @@ function updateAdminTableUI(adjs = null) {
             }
         }
 
+        // 獎金計算核心邏輯
         if (item === 'proj') {
-            const projAvg = parseFloat(document.getElementById('projAvgSpan').innerText) || 0;
-            const base = adjs ? (parseFloat(adjs[4]) || 80000) : 80000;
-            ref = Math.round(base * getProjectMultiplier_Frontend(projAvg));
+            // 💡 修正點：如果是 L1 職等，參考獎金直接設為 0
+            if (currentEmpRank === "L1") {
+                ref = 0;
+            } else {
+                const projAvg = parseFloat(document.getElementById('projAvgSpan').innerText) || 0;
+                // 若平均分為 0 也不給獎金
+                if (projAvg <= 0) {
+                    ref = 0;
+                } else {
+                    const base = adjs ? (parseFloat(adjs[4]) || 80000) : 80000;
+                    ref = Math.round(base * getProjectMultiplier_Frontend(projAvg));
+                }
+            }
         } else if (item === 'ye') {
             const q4 = timelineData.Q4;
             const yeBase = q4.r === "L1" ? (cfgAll.L1_Over_1Y || 0.5) : (cfgAll[q4.r + '_Base'] || 1.0);
@@ -366,11 +378,12 @@ function updateAdminTableUI(adjs = null) {
                 : Math.round(q.s * 0.25 * base * getPerfMult_Frontend(qScore, "quarterly"));
         }
 
+        // L1 人員如果專案分數為 0，連調整額 adj 也應該強制歸零（除非主管手動改過）
         const finalValue = ref + adj;
-
+        
         html += `<td>
             <span class="reference-text">參考:${ref.toLocaleString()}</span>
-            <input type="number" class="target-input" id="target_${item}"
+            <input type="number" class="target-input" id="target_${item}" 
                    value="${finalValue}" oninput="refreshTotal()">
         </td>`;
     });
@@ -379,7 +392,6 @@ function updateAdminTableUI(adjs = null) {
     rb.innerHTML = html;
     refreshTotal();
 }
-
 function refreshTotal() {
     let t = 0;
     ['target_f1', 'target_f2', 'target_f3', 'target_ye', 'target_proj'].forEach(id => {
