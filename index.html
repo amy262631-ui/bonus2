@@ -46,47 +46,46 @@
 
         /* 3. 讓報表視窗回歸正常區塊，不要固定在螢幕中央 */
         #reportModal {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            display: block !important;
-            background: white !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+    }
 
-        .report-content {
-            box-shadow: none !important;
-            padding: 10mm !important;
-            width: 100% !important;
-            max-width: none !important;
-            border: none !important;
-        }
+    .report-content {
+        box-shadow: none !important;
+        padding: 5mm !important; /* 縮小邊距確保不超出 A4 */
+        width: 100% !important;
+        max-width: none !important;
+    }
 
-        /* 4. 確保圖表在列印時有固定高度，不會縮小或塌陷 */
-        .report-charts {
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 15px !important;
-            height: 300px !important;
-            margin-top: 20px !important;
-            page-break-inside: avoid;
-        }
+    /* 💡 核心修正：改為垂直排列 (上下堆疊) */
+    .report-charts {
+        display: flex !important;
+        flex-direction: column !important; 
+        gap: 20px !important;
+        height: auto !important; /* 高度隨內容伸展 */
+        page-break-inside: auto; 
+    }
 
-        .chart-box {
-            flex: 1 !important;
-            border: 1px solid #eee !important;
-            height: 280px !important;
-        }
+    .chart-box {
+        width: 100% !important;
+        height: 350px !important; /* 固定每個圖表的高度 */
+        border: 1px solid #eee !important;
+        page-break-inside: avoid; /* 防止單個圖表被分頁切斷 */
+    }
 
-        /* 5. 表格樣式優化 */
-        .excel-report {
-            width: 100% !important;
-            table-layout: fixed !important;
-            border-collapse: collapse !important;
-        }
+    .excel-report {
+        width: 100% !important;
+        table-layout: fixed !important;
+        margin-bottom: 20px !important;
+        page-break-inside: avoid;
+    }
+}
 
         .excel-report th, .excel-report td {
             border: 1px solid #000 !important;
@@ -570,79 +569,67 @@ function printBonusReport() {
 }
 
 function renderPersonalCharts(data) {
-    const labels = data.map(d => d.year + '年');
+    // 確保年份按順序排列
+    const sortedData = [...data].sort((a, b) => parseInt(a.year) - parseInt(b.year));
+    const labels = sortedData.map(d => d.year + '年');
+    
+    // 圖表共通選項
     const commonOptions = {
         responsive: true,
-        maintainAspectRatio: false, // 關鍵：讓它填滿 CSS 設定的高度
-        animation: false, // 列印時關閉動畫，避免抓取到一半的畫面
+        maintainAspectRatio: false,
+        animation: false, // 列印必須關閉動畫
         plugins: {
-            legend: { position: 'top' },
-            datalabels: { display: true, align: 'top', formatter: v => v.toLocaleString() }
+            legend: { position: 'top', labels: { boxWidth: 12 } },
+            datalabels: {
+                display: true,
+                align: 'top',
+                formatter: v => v.toLocaleString(),
+                font: { weight: 'bold' }
+            }
         }
     };
-    
-    new Chart(document.getElementById('printPieChart'), { // 沿用原本 ID 但類型改為 bar
+
+    // 1. 上方：歷年堆疊長條圖
+    const ctxBar = document.getElementById('printPieChart').getContext('2d');
+    new Chart(ctxBar, {
         type: 'bar',
         data: {
             labels: labels,
             datasets: [
-                { label: '五一', data: data.map(d => d.f1), backgroundColor: '#3498db' },
-                { label: '端午', data: data.map(d => d.f2), backgroundColor: '#2980b9' },
-                { label: '中秋', data: data.map(d => d.f3), backgroundColor: '#1f618d' },
-                { label: '年終', data: data.map(d => d.ye), backgroundColor: '#27ae60' },
-                { label: '專案', data: data.map(d => d.proj), backgroundColor: '#e67e22' }
+                { label: '五一', data: sortedData.map(d => d.f1), backgroundColor: '#3498db' },
+                { label: '端午', data: sortedData.map(d => d.f2), backgroundColor: '#2980b9' },
+                { label: '中秋', data: sortedData.map(d => d.f3), backgroundColor: '#1f618d' },
+                { label: '年終', data: sortedData.map(d => d.ye), backgroundColor: '#27ae60' },
+                { label: '專案', data: sortedData.map(d => d.proj), backgroundColor: '#e67e22' }
             ]
         },
         options: {
-            maintainAspectRatio: false,
+            ...commonOptions,
             scales: {
-                x: { stacked: true }, // 開啟堆疊模式
+                x: { stacked: true },
                 y: { stacked: true, beginAtZero: true }
-            },
-            plugins: {
-                legend: { display: true, position: 'top' },
-                datalabels: {
-                    display: true,
-                    align: 'top',
-                    // 只在最頂端的數據（專案獎金）上顯示總計金額
-                    formatter: (v, ctx) => {
-                        if (ctx.datasetIndex === 4) {
-                            return data[ctx.dataIndex].total.toLocaleString();
-                        }
-                        return null;
-                    },
-                    font: { weight: 'bold' }
-                }
             }
         }
     });
 
-    // 2. 右側總額成長趨勢圖 (維持原樣)
-    new Chart(document.getElementById('printLineChart'), {
+    // 2. 下方：總額成長趨勢折線圖
+    const ctxLine = document.getElementById('printLineChart').getContext('2d');
+    new Chart(ctxLine, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
                 label: '年度總獎金',
-                data: data.map(d => d.total),
+                data: sortedData.map(d => d.total),
                 borderColor: '#e74c3c',
+                backgroundColor: '#e74c3c',
                 borderWidth: 3,
                 fill: false,
                 tension: 0.1,
-                pointRadius: 6,
-                pointBackgroundColor: '#e74c3c'
+                pointRadius: 6
             }]
         },
-        options: {
-            maintainAspectRatio: false,
-            plugins: {
-                datalabels: {
-                    display: true,
-                    align: 'top',
-                    formatter: v => v.toLocaleString()
-                }
-            }
-        }
+        options: commonOptions
     });
 }
 
