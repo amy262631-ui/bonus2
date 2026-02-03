@@ -426,14 +426,19 @@ async function askPassword() {
 async function openReport(mode) {
     const inner = document.getElementById('reportInner');
     const name = document.getElementById('selEmp').value;
-    const payload = { action: "getHistoryComparison", empName: (mode === 'all' ? "" : name) };
+    // 💡 修正：發送請求時，如果是 single 模式，務必傳遞 empName 給後端過濾
+    const payload = { 
+        action: "getHistoryComparison", 
+        empName: (mode === 'all' ? "" : name) 
+    };
 
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
         const r = await res.json();
 
-        if (r.status === "success" && r.history.length > 0) {
+        if (r.status === "success" && r.history && r.history.length > 0) {
             if (mode === 'all') {
+                // 🌐 【全體總表模式】
                 const grouped = r.history.reduce((acc, curr) => {
                     if (!acc[curr.empName]) acc[curr.empName] = [];
                     acc[curr.empName].push(curr);
@@ -461,12 +466,55 @@ async function openReport(mode) {
                         </table>
                     </div>`).join('');
             } else {
-                // 個人報表可以依需求補上
+                // 👤 【個人報表模式】 - 補齊此部分邏輯
+                // 確保資料按年份由舊到新排序
+                const personalHistory = r.history.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                
+                inner.innerHTML = `
+                    <div class="report-page" style="padding: 20px;">
+                        <h2 style="text-align:center; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">
+                            ${name} - 個人歷年獎金明細報告
+                        </h2>
+                        <table class="excel-report" style="width:100%;">
+                            <thead>
+                                <tr><th>年度</th><th>五一</th><th>端午</th><th>中秋</th><th>年終</th><th>專案</th><th>總計</th></tr>
+                            </thead>
+                            <tbody>
+                                ${personalHistory.map(h => `
+                                    <tr>
+                                        <td style="text-align:center; font-weight:bold;">${h.year}</td>
+                                        <td>${h.f1.toLocaleString()}</td>
+                                        <td>${h.f2.toLocaleString()}</td>
+                                        <td>${h.f3.toLocaleString()}</td>
+                                        <td>${h.ye.toLocaleString()}</td>
+                                        <td style="color:var(--project); font-weight:bold;">${h.proj.toLocaleString()}</td>
+                                        <td style="font-weight:bold; background:#fff3cd;">${h.total.toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        <div class="report-charts" style="display:flex; gap:15px; margin-top:30px; height:350px;">
+                            <div class="chart-box" style="flex:1;">
+                                <h3 style="text-align:center;">🏆 最新獎金比例</h3>
+                                <canvas id="printPieChart"></canvas>
+                            </div>
+                            <div class="chart-box" style="flex:1;">
+                                <h3 style="text-align:center;">📈 總額成長趨勢</h3>
+                                <canvas id="printLineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>`;
+                
+                // 延遲渲染圖表以確保 DOM 已掛載
+                setTimeout(() => renderPersonalCharts(personalHistory), 500);
             }
             document.getElementById('reportModal').style.display = 'block';
+        } else {
+            alert("查無歷史資料");
         }
     } catch (err) {
-        alert("報表生成失敗");
+        console.error("報表生成出錯:", err);
+        alert("報表生成失敗，請檢查 API 連線");
     }
 }
 
