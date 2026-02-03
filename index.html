@@ -530,27 +530,70 @@ function printBonusReport() {
 }
 
 function renderPersonalCharts(data) {
-    const last = data[data.length - 1];
-    new Chart(document.getElementById('printPieChart'), {
-        type: 'pie',
+    // 1. 準備歷年堆疊長條圖 (與前端主頁面樣式一致)
+    const labels = data.map(d => d.year + '年');
+    
+    new Chart(document.getElementById('printPieChart'), { // 沿用原本 ID 但類型改為 bar
+        type: 'bar',
         data: {
-            labels: ['五一', '端午', '中秋', '年終', '專案'],
-            datasets: [{
-                data: [last.f1, last.f2, last.f3, last.ye, last.proj],
-                backgroundColor: ['#3498db', '#2980b9', '#1f618d', '#27ae60', '#e67e22']
-            }]
+            labels: labels,
+            datasets: [
+                { label: '五一', data: data.map(d => d.f1), backgroundColor: '#3498db' },
+                { label: '端午', data: data.map(d => d.f2), backgroundColor: '#2980b9' },
+                { label: '中秋', data: data.map(d => d.f3), backgroundColor: '#1f618d' },
+                { label: '年終', data: data.map(d => d.ye), backgroundColor: '#27ae60' },
+                { label: '專案', data: data.map(d => d.proj), backgroundColor: '#e67e22' }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true }, // 開啟堆疊模式
+                y: { stacked: true, beginAtZero: true }
+            },
+            plugins: {
+                legend: { display: true, position: 'top' },
+                datalabels: {
+                    display: true,
+                    align: 'top',
+                    // 只在最頂端的數據（專案獎金）上顯示總計金額
+                    formatter: (v, ctx) => {
+                        if (ctx.datasetIndex === 4) {
+                            return data[ctx.dataIndex].total.toLocaleString();
+                        }
+                        return null;
+                    },
+                    font: { weight: 'bold' }
+                }
+            }
         }
     });
 
+    // 2. 右側總額成長趨勢圖 (維持原樣)
     new Chart(document.getElementById('printLineChart'), {
         type: 'line',
         data: {
-            labels: data.map(d => d.year),
+            labels: labels,
             datasets: [{
                 label: '年度總獎金',
                 data: data.map(d => d.total),
-                borderColor: '#e74c3c'
+                borderColor: '#e74c3c',
+                borderWidth: 3,
+                fill: false,
+                tension: 0.1,
+                pointRadius: 6,
+                pointBackgroundColor: '#e74c3c'
             }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                datalabels: {
+                    display: true,
+                    align: 'top',
+                    formatter: v => v.toLocaleString()
+                }
+            }
         }
     });
 }
