@@ -28,56 +28,96 @@
     .report-charts { display: flex; gap: 20px; margin-top: 30px; }
     .chart-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 10px; height: 400px; }
 
+/* --- 列印專用樣式開始 --- */
     @media print {
-        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone,
-        .score-container, canvas:not([id^="print"]), .avg-display {
+        /* 1. 隱藏不必要的 UI 元素 */
+        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
+        .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
             display: none !important;
         }
 
-        #salaryPage, #reportModal {
-            display: block !important;
-            position: relative !important;
+        /* 2. 重置頁面流：解決版面位移與大片空白的關鍵 */
+        body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+        }
+
+        /* 3. 讓報表視窗回歸正常區塊，不要固定在螢幕中央 */
+        #reportModal {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            background: white !important;
+            padding: 0 !important;
             margin: 0 !important;
         }
 
-        #reportModal { background: white !important; }
+        .report-content {
+            box-shadow: none !important;
+            padding: 10mm !important;
+            width: 100% !important;
+            max-width: none !important;
+            border: none !important;
+        }
 
+        /* 4. 確保圖表在列印時有固定高度，不會縮小或塌陷 */
+        .report-charts {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 15px !important;
+            height: 300px !important;
+            margin-top: 20px !important;
+            page-break-inside: avoid;
+        }
+
+        .chart-box {
+            flex: 1 !important;
+            border: 1px solid #eee !important;
+            height: 280px !important;
+        }
+
+        /* 5. 表格樣式優化 */
         .excel-report {
             width: 100% !important;
             table-layout: fixed !important;
+            border-collapse: collapse !important;
         }
 
         .excel-report th, .excel-report td {
             border: 1px solid #000 !important;
-            font-size: 14px !important;
+            font-size: 13px !important;
+            padding: 8px 4px !important;
         }
 
-        #thNameCol, .name-td {
-            display: table-cell !important;
+        /* 6. 強制換頁與欄位顯示邏輯 */
+        #thNameCol, .name-td { 
+            display: table-cell !important; 
         }
 
-        .report-page {
-            page-break-after: always !important;
+        .report-page { 
+            page-break-after: always !important; 
         }
 
-        /* 只列印獎金報表時：隱藏薪資頁 */
-        body.print-bonus #salaryPage {
-            display: none !important;
+        /* 7. 只列印獎金或薪資的切換邏輯 */
+        body.print-bonus #salaryPage { 
+            display: none !important; 
         }
 
-        /* 只列印薪資時：隱藏獎金畫面與獎金報表 */
-        body.print-salary .card:not(#salaryPage),
-        body.print-salary #reportModal {
-            display: none !important;
+        body.print-salary .card:not(#salaryPage), 
+        body.print-salary #reportModal { 
+            display: none !important; 
         }
 
-        /* 薪資列印時一定要把姓名欄顯示出來 */
-        body.print-salary #thNameCol,
-        body.print-salary .name-td {
-            display: table-cell !important;
+        body.print-salary #thNameCol, 
+        body.print-salary .name-td { 
+            display: table-cell !important; 
         }
-    }
+    } /* <--- 這是閉合 @media print 的最後一個大括號 */
     </style>
 </head>
 <body>
@@ -530,8 +570,16 @@ function printBonusReport() {
 }
 
 function renderPersonalCharts(data) {
-    // 1. 準備歷年堆疊長條圖 (與前端主頁面樣式一致)
     const labels = data.map(d => d.year + '年');
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false, // 關鍵：讓它填滿 CSS 設定的高度
+        animation: false, // 列印時關閉動畫，避免抓取到一半的畫面
+        plugins: {
+            legend: { position: 'top' },
+            datalabels: { display: true, align: 'top', formatter: v => v.toLocaleString() }
+        }
+    };
     
     new Chart(document.getElementById('printPieChart'), { // 沿用原本 ID 但類型改為 bar
         type: 'bar',
