@@ -29,78 +29,67 @@
     .chart-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 10px; height: 400px; }
 
 /* --- A4 橫式列印優化版 --- */
-    @media print {
-        @page {
-            size: A4 landscape;
-            margin: 5mm; /* 縮小邊距 */
-        }
-
-        body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-        }
-
-        /* 💡 移除空白關鍵：將彈窗改為靜態區塊，並強制頂端對齊 */
-        #reportModal, #salaryPage {
-            position: static !important; 
-            display: block !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        .report-content {
-            box-shadow: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            max-width: none !important;
-            border: none !important;
-        }
-
-        /* 隱藏 UI 元素 */
-        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
-        .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
-            display: none !important;
-        }
-
-        /* 表格格子補全與 A4 橫向撐滿 */
-        .excel-report {
-            width: 100% !important;
-            table-layout: fixed !important;
-            border-collapse: collapse !important;
-            border: 2px solid #000 !important;
-        }
-
-        .excel-report th, .excel-report td {
-            border: 1px solid #000 !important;
-            padding: 8px 4px !important;
-            word-break: break-all !important;
-        }
-
-        /* 確保全體列印時姓名欄出現 */
-        body.print-salary #thNameCol, 
-        body.print-salary .name-td { 
-            display: table-cell !important; 
-        }
-
-        /* 圖表改為垂直排列並確保高度 */
-        .report-charts {
-            display: flex !important;
-            flex-direction: column !important; 
-            gap: 15px !important;
-            height: auto !important;
-        }
-
-        .chart-box {
-            width: 100% !important;
-            height: 320px !important; /* A4 橫式適合的高度 */
-            border: 1px solid #eee !important;
-            page-break-inside: avoid;
-        }
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 5mm; /* 設定邊距 */
     }
+
+    body {
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    /* 💡 移除空白關鍵：將容器設為靜態，並取消所有邊距 */
+    #reportModal, #salaryPage {
+        position: static !important; 
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .report-content {
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        border: none !important;
+    }
+
+    /* 隱藏 UI 元素 */
+    .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
+    .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
+        display: none !important;
+    }
+
+    /* 表格邊框補強 (防止右側缺邊) */
+    .excel-report {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        border: 2px solid #000 !important;
+    }
+
+    .excel-report th, .excel-report td {
+        border: 1px solid #000 !important;
+        padding: 8px 4px !important;
+        word-break: break-all !important;
+    }
+
+    /* 💡 全體薪資分頁關鍵：遇到 .page-break 類別就換頁 */
+    .page-break {
+        page-break-after: always !important;
+    }
+
+    body.print-salary #thNameCol, 
+    body.print-salary .name-td { 
+        display: table-cell !important; 
+    }
+}
 </style>
 </head>
 <body>
@@ -788,12 +777,10 @@ async function printSalary(mode) {
     const body = document.getElementById('salaryBody');
     const thName = document.getElementById('thNameCol');
 
-    // 1. 初始化狀態
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 正在彙整資料...</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">🔍 正在彙整全體資料，請稍候...</td></tr>';
 
     if (mode === 'all') {
         try {
-            // 💡 確保這裡的 action 名稱與後端 GAS 一致
             const res = await fetch(API_URL, {
                 method: "POST",
                 body: JSON.stringify({ action: "getAllSalaryHistory" })
@@ -801,23 +788,39 @@ async function printSalary(mode) {
             const r = await res.json();
             
             if (r.status === "success" && r.data && r.data.length > 0) {
-                const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name) || new Date(a.date) - new Date(b.date));
+                // 按姓名排序
+                const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant') || new Date(a.date) - new Date(b.date));
+                thName.style.display = 'table-cell';
                 
-                thName.style.display = 'table-cell'; // 開啟姓名欄標題
+                let htmlOutput = "";
+                let currentName = "";
+
+                sorted.forEach((h, index) => {
+                    // 💡 分頁邏輯：如果姓名改變且不是第一筆，就插入分頁符號並重新畫表頭
+                    if (currentName !== "" && currentName !== h.name) {
+                        htmlOutput += `
+                            <tr class="page-break"><td colspan="7" style="border:none;"></td></tr>
+                            <tr class="no-print" style="height:20px;"><td colspan="7"></td></tr>
+                        `;
+                    }
+                    
+                    htmlOutput += `
+                        <tr>
+                            <td class="name-td" style="display:table-cell !important; text-align:center;">${h.name}</td>
+                            <td style="text-align:right; font-weight:bold;">$${Number(h.amount).toLocaleString()}</td>
+                            <td style="text-align:center;">-</td>
+                            <td style="text-align:center;">${h.date}</td>
+                            <td style="text-align:center;">${h.rank}</td>
+                            <td style="text-align:center;">${h.type || '-'}</td>
+                            <td style="text-align:left;">${h.note || '-'}</td>
+                        </tr>`;
+                    
+                    currentName = h.name;
+                });
                 
-                body.innerHTML = sorted.map(h => `
-                    <tr>
-                        <td class="name-td" style="display:table-cell !important;">${h.name}</td>
-                        <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
-                        <td style="text-align:center;">-</td>
-                        <td style="text-align:center;">${h.date}</td>
-                        <td style="text-align:center;">${h.rank}</td>
-                        <td style="text-align:center;">${h.type || '-'}</td>
-                        <td style="text-align:left;">${h.note || '-'}</td>
-                    </tr>
-                `).join('');
+                body.innerHTML = htmlOutput;
             } else {
-                throw new Error("雲端資料庫目前沒有薪資紀錄");
+                throw new Error("回傳資料為空");
             }
         } catch (e) {
             alert("❌ 抓取失敗：" + e.message);
@@ -829,27 +832,16 @@ async function printSalary(mode) {
         thName.style.display = 'none';
     }
 
-    // 2. 核心修正：給予足夠渲染時間再呼叫列印，防止空白
+    // 給予渲染時間後執行列印
     setTimeout(() => {
         document.body.classList.add('print-salary');
         window.print();
         
         setTimeout(() => {
             document.body.classList.remove('print-salary');
-            if (mode === 'all') loadSalaryHistoryLocal(); // 復原個人視圖
+            if (mode === 'all') loadSalaryHistoryLocal(); 
         }, 1000);
-    }, 1000); // 增加到 1 秒確保橫式佈局渲染完成
-}
-function switchTab(tab) {
-    const sp = document.getElementById('salaryPage');
-    if (tab === 'salary') {
-        sp.style.display = 'block';
-        loadSalaryHistoryLocal();
-        sp.scrollIntoView({ behavior: 'smooth' });
-    } else {
-        sp.style.display = 'none';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    }, 1000);
 }
 
 function updateScoreChart() {
