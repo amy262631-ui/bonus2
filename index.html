@@ -29,67 +29,87 @@
     .chart-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 10px; height: 400px; }
 
 /* --- A4 橫式列印優化版 --- */
-@media print {
-    @page {
-        size: A4 landscape;
-        margin: 5mm; /* 設定邊距 */
-    }
+/* --- A4 橫式列印最終優化版 --- */
+    @media print {
+        @page {
+            size: A4 landscape;
+            margin: 5mm; /* 邊距設定 */
+        }
 
-    body {
-        background: white !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: visible !important;
-    }
+        body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+        }
 
-    /* 💡 移除空白關鍵：將容器設為靜態，並取消所有邊距 */
-    #reportModal, #salaryPage {
-        position: static !important; 
-        display: block !important;
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
+        /* 💡 移除空白核心：強制將容器推至頂端並重置定位 */
+        #reportModal, #salaryPage {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
 
-    .report-content {
-        box-shadow: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        max-width: none !important;
-        border: none !important;
-    }
+        .report-content {
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            border: none !important;
+        }
 
-    /* 隱藏 UI 元素 */
-    .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
-    .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
-        display: none !important;
-    }
+        /* 隱藏不必要的 UI */
+        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
+        .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
+            display: none !important;
+        }
 
-    /* 表格邊框補強 (防止右側缺邊) */
-    .excel-report {
-        width: 100% !important;
-        table-layout: fixed !important;
-        border-collapse: collapse !important;
-        border: 2px solid #000 !important;
-    }
+        /* 表格結構：確保橫式滿幅且邊框不遺漏 */
+        .excel-report {
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            border: 2px solid #000 !important;
+            margin-top: 0 !important;
+        }
 
-    .excel-report th, .excel-report td {
-        border: 1px solid #000 !important;
-        padding: 8px 4px !important;
-        word-break: break-all !important;
-    }
+        .excel-report th, .excel-report td {
+            border: 1px solid #000 !important;
+            padding: 8px 4px !important;
+            word-break: break-all !important;
+        }
 
-    /* 💡 全體薪資分頁關鍵：遇到 .page-break 類別就換頁 */
-    .page-break {
-        page-break-after: always !important;
-    }
+        /* 💡 全體分頁關鍵：強制換頁類別 */
+        .page-break {
+            page-break-after: always !important;
+            height: 0 !important;
+            display: block;
+        }
 
-    body.print-salary #thNameCol, 
-    body.print-salary .name-td { 
-        display: table-cell !important; 
+        /* 薪資模式顯示控制 */
+        body.print-salary #thNameCol, 
+        body.print-salary .name-td { 
+            display: table-cell !important; 
+        }
+
+        /* 圖表排列調整 (上下堆疊) */
+        .report-charts {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 20px !important;
+            margin-top: 10px !important;
+        }
+        .chart-box {
+            width: 100% !important;
+            height: 320px !important;
+            page-break-inside: avoid;
+        }
     }
-}
 </style>
 </head>
 <body>
@@ -844,6 +864,84 @@ async function printSalary(mode) {
     }, 1000);
 }
 
+ // 💡 補齊缺失的切換分頁功能
+function switchTab(tab) {
+    const sp = document.getElementById('salaryPage');
+    if (tab === 'salary') {
+        sp.style.display = 'block';
+        loadSalaryHistoryLocal(); // 切換時同步載入當前人員薪資
+        sp.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        sp.style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+// 💡 修正後的列印函式：解決全體資料抓取、一人一頁、移除空白
+async function printSalary(mode) {
+    const body = document.getElementById('salaryBody');
+    const thName = document.getElementById('thNameCol');
+
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">🔍 正在從雲端彙整資料，請稍候...</td></tr>';
+
+    if (mode === 'all') {
+        try {
+            const res = await fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify({ action: "getAllSalaryHistory" })
+            });
+            const r = await res.json();
+            
+            if (r.status === "success" && r.data && r.data.length > 0) {
+                // 按姓名排序，確保同一人的資料排在一起
+                const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant') || new Date(a.date) - new Date(b.date));
+                thName.style.display = 'table-cell';
+                
+                let htmlOutput = "";
+                let currentName = "";
+
+                sorted.forEach((h) => {
+                    // 💡 分頁邏輯：如果姓名改變，插入帶有 page-break 類別的隱藏行
+                    if (currentName !== "" && currentName !== h.name) {
+                        htmlOutput += `<tr class="page-break"><td colspan="7" style="border:none; height:0;"></td></tr>`;
+                    }
+                    
+                    htmlOutput += `
+                        <tr>
+                            <td class="name-td" style="display:table-cell !important; text-align:center;">${h.name}</td>
+                            <td style="text-align:right; font-weight:bold;">$${Number(h.amount).toLocaleString()}</td>
+                            <td style="text-align:center; color:#d35400;">-</td>
+                            <td style="text-align:center;">${h.date}</td>
+                            <td style="text-align:center;">${h.rank}</td>
+                            <td style="text-align:center;">${h.type || '-'}</td>
+                            <td style="text-align:left;">${h.note || '-'}</td>
+                        </tr>`;
+                    currentName = h.name;
+                });
+                body.innerHTML = htmlOutput;
+            } else {
+                throw new Error("回傳資料為空");
+            }
+        } catch (e) {
+            alert("❌ 抓取全體資料失敗：" + e.message);
+            loadSalaryHistoryLocal(); 
+            return;
+        }
+    } else {
+        await loadSalaryHistoryLocal(); // 個人模式
+        thName.style.display = 'none';
+    }
+
+    // 💡 確保渲染完成後執行列印，防止空白
+    setTimeout(() => {
+        document.body.classList.add('print-salary');
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('print-salary');
+            if (mode === 'all') loadSalaryHistoryLocal(); 
+        }, 1000);
+    }, 1000);
+}   
 function updateScoreChart() {
     const ctx = document.getElementById('scoreChart').getContext('2d');
     if (scoreChart) scoreChart.destroy();
