@@ -46,46 +46,47 @@
 
         /* 3. 讓報表視窗回歸正常區塊，不要固定在螢幕中央 */
         #reportModal {
-        position: static !important;
-        display: block !important;
-        width: 100% !important;
-        height: auto !important;
-        background: white !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: visible !important;
-    }
+            position: static !important;
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+        }
 
-    .report-content {
-        box-shadow: none !important;
-        padding: 5mm !important; /* 縮小邊距確保不超出 A4 */
-        width: 100% !important;
-        max-width: none !important;
-    }
+        .report-content {
+            box-shadow: none !important;
+            padding: 5mm !important; /* 縮小邊距確保不超出 A4 */
+            width: 100% !important;
+            max-width: none !important;
+        }
 
-    /* 💡 核心修正：改為垂直排列 (上下堆疊) */
-    .report-charts {
-        display: flex !important;
-        flex-direction: column !important; 
-        gap: 20px !important;
-        height: auto !important; /* 高度隨內容伸展 */
-        page-break-inside: auto; 
-    }
+        /* 4. 核心修正：改為垂直排列 (上下堆疊) */
+        .report-charts {
+            display: flex !important;
+            flex-direction: column !important; 
+            gap: 20px !important;
+            height: auto !important; /* 高度隨內容伸展 */
+            page-break-inside: auto; 
+        }
 
-    .chart-box {
-        width: 100% !important;
-        height: 350px !important; /* 固定每個圖表的高度 */
-        border: 1px solid #eee !important;
-        page-break-inside: avoid; /* 防止單個圖表被分頁切斷 */
-    }
+        .chart-box {
+            width: 100% !important;
+            height: 350px !important; /* 固定每個圖表的高度 */
+            border: 1px solid #eee !important;
+            page-break-inside: avoid; /* 防止單個圖表被分頁切斷 */
+        }
 
-    .excel-report {
-        width: 100% !important;
-        table-layout: fixed !important;
-        margin-bottom: 20px !important;
-        page-break-inside: avoid;
-    }
-}
+        /* 5. 表格樣式優化 */
+        .excel-report {
+            width: 100% !important;
+            table-layout: fixed !important;
+            margin-bottom: 20px !important;
+            page-break-inside: avoid;
+            border-collapse: collapse !important;
+        }
 
         .excel-report th, .excel-report td {
             border: 1px solid #000 !important;
@@ -116,8 +117,9 @@
         body.print-salary .name-td { 
             display: table-cell !important; 
         }
-    } /* <--- 這是閉合 @media print 的最後一個大括號 */
-    </style>
+
+    } /* <--- 這是閉合 @media print 的大括號 */
+</style>
 </head>
 <body>
 <div class="card">
@@ -182,7 +184,15 @@
 </div>
 
 <div id="salaryPage" style="display:none;" class="card">
-    <h2 style="color:var(--primary); border-bottom:2px solid var(--accent); padding-bottom:10px;">💵 薪資歷史 - <span id="salaryTargetName"></span></h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--accent); padding-bottom:10px; margin-bottom:15px;">
+        <h2 style="color:var(--primary); margin:0;">💵 薪資歷史 - <span id="salaryTargetName"></span></h2>
+        
+        <div class="no-print" style="display:flex; gap:10px;">
+            <button class="btn" style="background:var(--accent);" onclick="printSalary('single')">🖨️ 列印個人薪資</button>
+            <button class="btn" style="background:var(--primary);" onclick="printSalary('all')">🌐 列印全體薪資</button>
+        </div>
+    </div>
+
     <div id="salaryAddZone" class="no-print" style="background:#f9f9f9; padding:15px; margin:15px 0; border-radius:10px;">
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
             <input type="date" id="newSalaryDate">
@@ -198,6 +208,7 @@
             <button class="btn" style="background:var(--success);" onclick="submitNewSalary()">新增</button>
         </div>
     </div>
+
     <table class="excel-report">
         <thead>
             <tr style="background:#f4f4f4;">
@@ -210,7 +221,8 @@
                 <th>決策備註</th>
             </tr>
         </thead>
-        <tbody id="salaryBody"></tbody>
+        <tbody id="salaryBody">
+            </tbody>
     </table>
 </div>
 
@@ -791,39 +803,56 @@ async function submitNewSalary() {
 }
 
 async function printSalary(mode) {
-    if (mode === 'all') {
-        document.getElementById('thNameCol').style.display = 'table-cell';
-        const res = await fetch(API_URL, {
-            method: "POST",
-            body: JSON.stringify({ action: "getAllSalaryHistory" })
-        });
-        const r = await res.json();
-        const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name) || new Date(a.date) - new Date(b.date));
+    const body = document.getElementById('salaryBody');
+    const thName = document.getElementById('thNameCol');
 
-        document.getElementById('salaryBody').innerHTML = sorted.map(h => `
-            <tr>
-                <td class="name-td">${h.name}</td>
-                <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
-                <td style="text-align:center;">-</td>
-                <td style="text-align:center;">${h.date}</td>
-                <td style="text-align:center;">${h.rank}</td>
-                <td style="text-align:center;">${h.type || '-'}</td>
-                <td>${h.note || '-'}</td>
-            </tr>
-        `).join('');
+    // 1. 抓取資料
+    if (mode === 'all') {
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 正在彙整全體同仁薪資資料...</td></tr>';
+        try {
+            const res = await fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify({ action: "getAllSalaryHistory" })
+            });
+            const r = await res.json();
+            if (r.status === "success") {
+                // 按姓名與日期排序
+                const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name) || new Date(a.date) - new Date(b.date));
+                thName.style.display = 'table-cell'; // 顯示姓名欄標題
+                body.innerHTML = sorted.map(h => `
+                    <tr>
+                        <td class="name-td">${h.name}</td>
+                        <td style="text-align:right; font-weight:bold;">$${Number(h.amount).toLocaleString()}</td>
+                        <td style="text-align:center;">-</td>
+                        <td style="text-align:center;">${h.date}</td>
+                        <td style="text-align:center;">${h.rank}</td>
+                        <td style="text-align:center;">${h.type || '-'}</td>
+                        <td>${h.note || '-'}</td>
+                    </tr>
+                `).join('');
+            }
+        } catch (e) {
+            alert("抓取全體資料失敗");
+            return;
+        }
     } else {
+        // 個人模式：直接使用目前的載入邏輯
         await loadSalaryHistoryLocal();
+        thName.style.display = 'none'; // 個人報表不需要姓名欄（標題已顯示）
     }
 
+    // 2. 執行列印
     setTimeout(() => {
         document.body.classList.add('print-salary');
         document.body.classList.remove('print-bonus');
-
         window.print();
 
+        // 3. 列印結束後恢復 UI
         setTimeout(() => {
             document.body.classList.remove('print-salary');
-            if (mode === 'all') loadSalaryHistoryLocal();
+            if (mode === 'all') {
+                loadSalaryHistoryLocal(); // 恢復成原本個人的顯示模式
+            }
         }, 500);
     }, 500);
 }
