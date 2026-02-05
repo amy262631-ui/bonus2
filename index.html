@@ -770,65 +770,6 @@ async function submitNewSalary() {
     }
 }
 
-async function printSalary(mode) {
-    const body = document.getElementById('salaryBody');
-    const thName = document.getElementById('thNameCol');
-
-    if (mode === 'all') {
-        try {
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getAllSalaryHistory" }) });
-            const r = await res.json();
-            if (r.status === "success" && r.data) {
-                // 先按姓名、再按日期由舊到新排序，才能算調幅
-                const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant') || new Date(a.date) - new Date(b.date));
-                
-                let htmlOutput = "";
-                let currentName = "";
-                let lastAmount = 0;
-
-                sorted.forEach((h) => {
-                    // 如果換人，重置調幅與插入分頁
-                    if (currentName !== "" && currentName !== h.name) {
-                        htmlOutput += `<tr class="page-break"><td colspan="7"></td></tr>`;
-                        lastAmount = 0; // 換人時調幅重置
-                    }
-
-                    // 💡 計算調幅 %
-                    let diffText = "-";
-                    if (lastAmount > 0) {
-                        const d = ((h.amount - lastAmount) / lastAmount * 100);
-                        diffText = (d >= 0 ? "+" : "") + d.toFixed(1) + "%";
-                    }
-
-                    htmlOutput += `
-                        <tr>
-                            <td class="name-td" style="display:table-cell !important;">${h.name}</td>
-                            <td style="text-align:right; font-weight:bold;">$${Number(h.amount).toLocaleString()}</td>
-                            <td style="font-weight:bold;">${diffText}</td>
-                            <td>${h.date}</td>
-                            <td>${h.rank}</td>
-                            <td>${h.type || '-'}</td>
-                            <td style="text-align:left;">${h.note || '-'}</td>
-                        </tr>`;
-                    
-                    currentName = h.name;
-                    lastAmount = h.amount;
-                });
-                body.innerHTML = htmlOutput;
-                thName.style.display = 'table-cell';
-            }
-        } catch (e) { alert("資料抓取失敗"); return; }
-    } else {
-        await loadSalaryHistoryLocal(); // 個人模式維持原計算邏輯
-    }
-
-    // 💡 增加渲染延遲，確保分頁與邊框計算準確
-    setTimeout(() => {
-        document.body.classList.add('print-salary');
-        window.print();
-        setTimeout(() => document.body.classList.remove('print-salary'), 1000);
-    }, 1200);
-}
 
  // 💡 補齊缺失的切換分頁功能
 function switchTab(tab) {
@@ -843,7 +784,19 @@ function switchTab(tab) {
     }
 }
 
-// 💡 修正後的列印函式：解決全體資料抓取、一人一頁、移除空白
+function switchTab(tab) {
+    const sp = document.getElementById('salaryPage');
+    if (tab === 'salary') {
+        sp.style.display = 'block';
+        loadSalaryHistoryLocal(); 
+        sp.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        sp.style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+// 2. 修正後的薪資列印函式 (只留這一個最強大的版本)
 async function printSalary(mode) {
     const body = document.getElementById('salaryBody');
     const thName = document.getElementById('thNameCol');
@@ -867,7 +820,7 @@ async function printSalary(mode) {
                 let currentName = "";
 
                 sorted.forEach((h) => {
-                    // 💡 分頁邏輯：如果姓名改變，插入帶有 page-break 類別的隱藏行
+                    // 分頁邏輯：如果姓名改變，插入帶有 page-break 類別的隱藏行
                     if (currentName !== "" && currentName !== h.name) {
                         htmlOutput += `<tr class="page-break"><td colspan="7" style="border:none; height:0;"></td></tr>`;
                     }
@@ -898,7 +851,7 @@ async function printSalary(mode) {
         thName.style.display = 'none';
     }
 
-    // 💡 確保渲染完成後執行列印，防止空白
+    // 確保渲染完成後執行列印，防止空白
     setTimeout(() => {
         document.body.classList.add('print-salary');
         window.print();
@@ -907,7 +860,7 @@ async function printSalary(mode) {
             if (mode === 'all') loadSalaryHistoryLocal(); 
         }, 1000);
     }, 1000);
-}   
+}
 function updateScoreChart() {
     const ctx = document.getElementById('scoreChart').getContext('2d');
     if (scoreChart) scoreChart.destroy();
