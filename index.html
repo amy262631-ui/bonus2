@@ -28,88 +28,85 @@
     .report-charts { display: flex; gap: 20px; margin-top: 30px; }
     .chart-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 10px; height: 400px; }
 
-/* --- A4 橫式列印優化版 --- */
-/* --- A4 橫式列印最終優化版 --- */
-    @media print {
-        @page {
-            size: A4 landscape;
-            margin: 5mm; /* 邊距設定 */
-        }
-
-        body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-        }
-
-        /* 💡 移除空白核心：強制將容器推至頂端並重置定位 */
-        #reportModal, #salaryPage {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            display: block !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        .report-content {
-            box-shadow: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            max-width: none !important;
-            border: none !important;
-        }
-
-        /* 隱藏不必要的 UI */
-        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
-        .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
-            display: none !important;
-        }
-
-        /* 表格結構：確保橫式滿幅且邊框不遺漏 */
-        .excel-report {
-            width: 100% !important;
-            table-layout: fixed !important;
-            border-collapse: collapse !important;
-            border: 2px solid #000 !important;
-            margin-top: 0 !important;
-        }
-
-        .excel-report th, .excel-report td {
-            border: 1px solid #000 !important;
-            padding: 8px 4px !important;
-            word-break: break-all !important;
-        }
-
-        /* 💡 全體分頁關鍵：強制換頁類別 */
-        .page-break {
-            page-break-after: always !important;
-            height: 0 !important;
-            display: block;
-        }
-
-        /* 薪資模式顯示控制 */
-        body.print-salary #thNameCol, 
-        body.print-salary .name-td { 
-            display: table-cell !important; 
-        }
-
-        /* 圖表排列調整 (上下堆疊) */
-        .report-charts {
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 20px !important;
-            margin-top: 10px !important;
-        }
-        .chart-box {
-            width: 100% !important;
-            height: 320px !important;
-            page-break-inside: avoid;
-        }
+/* --- A4 橫式列印穩定版 --- */
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 5mm; /* 強制設定邊距 */
     }
+
+    body {
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    /* 💡 核心修正：取消所有 absolute/fixed 定位，改為 block 流 */
+    #reportModal, #salaryPage {
+        position: static !important; /* 讓 modal 不再浮動 */
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .report-content {
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        border: none !important;
+    }
+
+    /* 隱藏 UI 元件 */
+    .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
+    .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
+        display: none !important;
+    }
+
+    /* 修正表格與邊框 */
+    .excel-report {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        border: 2px solid #000 !important;
+        margin-top: 10px !important;
+    }
+
+    .excel-report th, .excel-report td {
+        border: 1px solid #000 !important;
+        padding: 8px 4px !important;
+        word-break: break-all !important;
+    }
+
+    /* 全體薪資模式顯示 */
+    body.print-salary #thNameCol, 
+    body.print-salary .name-td { 
+        display: table-cell !important; 
+    }
+
+    /* 💡 核心修正：強制分頁符號 */
+    .page-break {
+        display: block;
+        page-break-after: always !important;
+        height: 0 !important;
+    }
+
+    /* 修正圖表上下堆疊在橫向下的比例 */
+    .report-charts {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 20px !important;
+    }
+    .chart-box {
+        width: 100% !important;
+        height: 330px !important; /* A4 橫向最適合的高度 */
+        page-break-inside: avoid;
+    }
+}
 </style>
 </head>
 <body>
@@ -797,7 +794,7 @@ async function printSalary(mode) {
     const body = document.getElementById('salaryBody');
     const thName = document.getElementById('thNameCol');
 
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">🔍 正在彙整全體資料，請稍候...</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 正在彙整資料...</td></tr>';
 
     if (mode === 'all') {
         try {
@@ -808,7 +805,6 @@ async function printSalary(mode) {
             const r = await res.json();
             
             if (r.status === "success" && r.data && r.data.length > 0) {
-                // 按姓名排序
                 const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant') || new Date(a.date) - new Date(b.date));
                 thName.style.display = 'table-cell';
                 
@@ -816,11 +812,10 @@ async function printSalary(mode) {
                 let currentName = "";
 
                 sorted.forEach((h, index) => {
-                    // 💡 分頁邏輯：如果姓名改變且不是第一筆，就插入分頁符號並重新畫表頭
+                    // 💡 如果換人，插入分頁符號
                     if (currentName !== "" && currentName !== h.name) {
                         htmlOutput += `
                             <tr class="page-break"><td colspan="7" style="border:none;"></td></tr>
-                            <tr class="no-print" style="height:20px;"><td colspan="7"></td></tr>
                         `;
                     }
                     
@@ -837,14 +832,10 @@ async function printSalary(mode) {
                     
                     currentName = h.name;
                 });
-                
                 body.innerHTML = htmlOutput;
-            } else {
-                throw new Error("回傳資料為空");
             }
         } catch (e) {
-            alert("❌ 抓取失敗：" + e.message);
-            loadSalaryHistoryLocal(); 
+            alert("❌ 抓取資料失敗，回傳資料為空");
             return;
         }
     } else {
@@ -852,16 +843,15 @@ async function printSalary(mode) {
         thName.style.display = 'none';
     }
 
-    // 給予渲染時間後執行列印
+    // 💡 延遲執行，確保 Modal 已完全渲染並移除白色遮蔽
     setTimeout(() => {
         document.body.classList.add('print-salary');
         window.print();
-        
         setTimeout(() => {
             document.body.classList.remove('print-salary');
-            if (mode === 'all') loadSalaryHistoryLocal(); 
+            if (mode === 'all') loadSalaryHistoryLocal();
         }, 1000);
-    }, 1000);
+    }, 1200); // 增加等待時間以解決渲染延遲
 }
 
  // 💡 補齊缺失的切換分頁功能
