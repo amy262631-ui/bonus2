@@ -29,104 +29,72 @@
     .chart-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 10px; height: 400px; }
 
  /* --- 列印專用樣式開始 --- */
-    @media print {
-        /* 1. 隱藏所有非列印 UI 元素 */
-        .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
-        .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
-            display: none !important;
-        }
+   @media print {
+    /* 💡 強制設定 A4 橫式列印 */
+    @page {
+        size: A4 landscape;
+        margin: 10mm;
+    }
 
-        /* 2. 重置頁面與 Body 設定，確保從紙張頂端開始 */
-        body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-        }
+    /* 重置 Body，確保內容撐滿橫向空間 */
+    body {
+        background: white !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
 
-        /* 3. 讓報表容器回歸一般區塊流，解決彈窗定位導致的空白問題 */
-        #reportModal {
-            position: static !important;
-            display: block !important;
-            width: 100% !important;
-            height: auto !important;
-            background: white !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            overflow: visible !important;
-        }
+    /* 隱藏不必要的 UI */
+    .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
+    .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn {
+        display: none !important;
+    }
 
-        .report-content {
-            box-shadow: none !important;
-            padding: 5mm !important; /* 確保內容在 A4 範圍內 */
-            width: 100% !important;
-            max-width: none !important;
-            border: none !important;
-        }
+    /* 確保薪資頁與報表容器回歸一般區塊流 */
+    #salaryPage, #reportModal {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
 
-        /* 4. 圖表垂直排列設定 */
-        .report-charts {
-            display: flex !important;
-            flex-direction: column !important; 
-            gap: 20px !important;
-            height: auto !important;
-            page-break-inside: auto; 
-        }
+    /* 💡 表格樣式強化：解決右側邊框斷裂與格子缺失 */
+    .excel-report {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        border: 2px solid #000 !important; /* 加粗外框 */
+        margin-bottom: 20px !important;
+    }
 
-        .chart-box {
-            width: 100% !important;
-            height: 350px !important;
-            border: 1px solid #eee !important;
-            page-break-inside: avoid;
-        }
+    .excel-report th, .excel-report td {
+        border: 1px solid #000 !important; /* 內部格線 */
+        padding: 8px 5px !important;
+        font-size: 14px !important;
+        word-break: break-all !important;
+    }
 
-        /* 5. 薪資與獎金表格樣式強化：解決右側缺邊框與斷裂問題 */
-        .excel-report {
-            width: 100% !important;
-            table-layout: fixed !important; /* 強制格子對齊 */
-            margin-bottom: 20px !important;
-            page-break-inside: avoid;
-            border-collapse: collapse !important;
-            border: 1px solid #000 !important; /* 外層全黑框 */
-        }
+    /* 強制補齊最後一欄右邊線 (決策備註) */
+    .excel-report th:last-child, 
+    .excel-report td:last-child {
+        border-right: 1px solid #000 !important;
+    }
 
-        .excel-report th, .excel-report td {
-            border: 1px solid #000 !important; /* 內部所有格子線條 */
-            font-size: 13px !important;
-            padding: 8px 4px !important;
-            word-break: break-all !important; /* 長文字自動換行避免撐爆表格 */
-        }
+    /* 橫式圖表排列：改為橫向並排或適度縮小 */
+    .report-charts {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 15px !important;
+        height: 350px !important;
+    }
 
-        /* 💡 修正：確保最後一欄（決策備註）有右邊線 */
-        .excel-report th:last-child, 
-        .excel-report td:last-child {
-            border-right: 1px solid #000 !important;
-        }
-
-        /* 6. 強制分頁與姓名欄位顯示 */
-        .report-page { 
-            page-break-after: always !important; 
-        }
-
-        /* 7. 薪資/獎金模式切換邏輯 */
-        /* 只列印獎金報表時：隱藏薪資頁 */
-        body.print-bonus #salaryPage { 
-            display: none !important; 
-        }
-
-        /* 只列印薪資時：隱藏獎金所有元件 */
-        body.print-salary .card:not(#salaryPage), 
-        body.print-salary #reportModal { 
-            display: none !important; 
-        }
-
-        /* 核心：薪資列印時（個人與全體）強制開啟姓名欄與標題 */
-        body.print-salary #thNameCol, 
-        body.print-salary .name-td { 
-            display: table-cell !important; 
-        }
-
-    } /* <--- 閉合 @media print 的大括號 */
+    .chart-box {
+        flex: 1 !important;
+        height: 100% !important;
+        border: 1px solid #ddd !important;
+    }
+}
 </style>
 </head>
 <body>
@@ -814,12 +782,11 @@ async function printSalary(mode) {
     const body = document.getElementById('salaryBody');
     const thName = document.getElementById('thNameCol');
 
-    // 💡 1. 預處理：顯示載入狀態
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 正在彙整資料，請稍候...</td></tr>';
+    // 顯示載入中提示
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 正在彙整全體同仁薪資資料，請稍候...</td></tr>';
 
     if (mode === 'all') {
         try {
-            // 💡 抓取全體資料
             const res = await fetch(API_URL, {
                 method: "POST",
                 body: JSON.stringify({ action: "getAllSalaryHistory" })
@@ -827,17 +794,16 @@ async function printSalary(mode) {
             const r = await res.json();
             
             if (r.status === "success" && r.data) {
-                // 💡 按姓名排序
+                // 按姓名與日期排序
                 const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name) || new Date(a.date) - new Date(b.date));
                 
-                // 💡 強制開啟姓名欄標題
+                // 強制顯示姓名欄標題
                 thName.style.display = 'table-cell';
-                thName.style.setProperty('display', 'table-cell', 'important');
                 
                 body.innerHTML = sorted.map(h => `
                     <tr>
                         <td class="name-td" style="display:table-cell !important;">${h.name}</td>
-                        <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
+                        <td style="text-align:right; font-weight:bold;">$${Number(h.amount).toLocaleString()}</td>
                         <td style="text-align:center;">-</td>
                         <td style="text-align:center;">${h.date}</td>
                         <td style="text-align:center;">${h.rank}</td>
@@ -849,33 +815,30 @@ async function printSalary(mode) {
                 throw new Error("回傳資料為空");
             }
         } catch (e) {
-            alert("抓取全體資料失敗：" + e.message);
-            loadSalaryHistoryLocal(); // 失敗則滾回個人畫面
+            alert("抓取資料失敗: " + e.message);
+            loadSalaryHistoryLocal(); // 復原原本顯示
             return;
         }
     } else {
-        // 💡 個人模式：確保目前畫面上的資料已載入
+        // 個人模式
         await loadSalaryHistoryLocal();
-        thName.style.display = 'none'; // 個人報表隱藏姓名欄
+        thName.style.display = 'none';
     }
 
-    // 💡 2. 核心：確保 DOM 渲染後再執行列印
+    // 💡 設定延遲，確保橫式佈局計算完成再列印
     setTimeout(() => {
         document.body.classList.add('print-salary');
-        document.body.classList.remove('print-bonus');
-
-        // 💡 呼叫瀏覽器列印
         window.print();
-
-        // 💡 3. 清理：恢復 UI 狀態
+        
+        // 列印結束後清理
         setTimeout(() => {
             document.body.classList.remove('print-salary');
             if (mode === 'all') {
                 thName.style.display = 'none';
-                loadSalaryHistoryLocal(); // 恢復個人原本的頁面
+                loadSalaryHistoryLocal(); 
             }
         }, 1000);
-    }, 800); // 給予足夠時間讓瀏覽器計算表格佈局
+    }, 800);
 }
 
 function switchTab(tab) {
