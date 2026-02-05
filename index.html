@@ -28,85 +28,63 @@
     .report-charts { display: flex; gap: 20px; margin-top: 30px; }
     .chart-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 10px; height: 400px; }
 
-/* --- A4 橫式列印徹底歸位版 --- */
+/* --- A4 橫式列印精確版 --- */
 @media print {
     @page {
         size: A4 landscape;
-        margin: 0; /* 移除紙張邊距，改由內容控制 */
+        margin: 5mm; /* 稍微留白避免被印表機裁切 */
     }
 
-    /* 💡 核心修正 1：移除所有遮罩與背景佔位 */
-    html, body {
-        height: auto !important;
-        overflow: visible !important;
-        background: white !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    /* 💡 核心修正 2：強制移除 Modal 定位與任何位移 */
-    #reportModal {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        background: white !important;
+    /* 💡 強制重置定位，解決第一位同仁被遮蔽問題 */
+    #reportModal, #salaryPage {
+        position: static !important;
         display: block !important;
-        z-index: auto !important;
-    }
-
-    /* 確保薪資頁也同樣歸位 */
-    #salaryPage {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
         width: 100% !important;
-        display: block !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
 
-    /* 💡 核心修正 3：移除內容容器的陰影與外邊距 */
-    .report-content, .card {
-        box-shadow: none !important;
-        border: none !important;
+    .report-content {
+        padding: 0 !important;
         margin: 0 !important;
-        padding: 10mm !important; /* 在內容層設定列印邊距 */
-        transform: none !important; /* 確保沒有位移 */
     }
 
-    /* 隱藏所有 UI 元件 */
-    .no-print, .btn, #salaryAddZone, .header-controls, #adminZone, 
-    .score-container, canvas:not([id^="print"]), .avg-display, #unlockBtn, .modal-backdrop {
-        display: none !important;
-    }
-
-    /* 表格邊框補全與寬度 */
+    /* 💡 核心：精確分配欄位寬度，防止右側超出 */
     .excel-report {
         width: 100% !important;
-        table-layout: fixed !important;
+        table-layout: fixed !important; /* 強制執行固定寬度 */
         border-collapse: collapse !important;
         border: 2px solid #000 !important;
-        margin-top: 0 !important;
     }
 
+    /* 分配寬度：姓名(10%)、金額(15%)、調幅(10%)、日期(15%)、職等(8%)、類別(12%)、備註(30%) */
     .excel-report th, .excel-report td {
         border: 1px solid #000 !important;
-        padding: 6px 4px !important;
+        padding: 4px 2px !important;
+        font-size: 11px !important; /* 縮小字體以塞進更多內容 */
         word-break: break-all !important;
+        text-align: center;
+        overflow: hidden;
     }
 
-    /* 分頁符號 */
+    /* 確保調幅欄位一定看得見 */
+    .excel-report th:nth-child(3), 
+    .excel-report td:nth-child(3) {
+        width: 60px !important;
+        color: #d35400 !important; /* 強制保持深橘色 */
+    }
+
+    /* 最後一欄備註強制要有右邊框 */
+    .excel-report th:last-child, 
+    .excel-report td:last-child {
+        text-align: left;
+        border-right: 1px solid #000 !important;
+    }
+
     .page-break {
         display: block;
-        page-break-before: always !important; /* 改為 page-break-before 確保第一人不會被切斷 */
+        page-break-before: always !important;
         height: 0 !important;
-    }
-
-    /* 薪資模式顯示控制 */
-    body.print-salary #thNameCol, 
-    body.print-salary .name-td { 
-        display: table-cell !important; 
     }
 }
 </style>
@@ -796,64 +774,60 @@ async function printSalary(mode) {
     const body = document.getElementById('salaryBody');
     const thName = document.getElementById('thNameCol');
 
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;">🔍 正在處理中...</td></tr>';
-
     if (mode === 'all') {
         try {
-            const res = await fetch(API_URL, {
-                method: "POST",
-                body: JSON.stringify({ action: "getAllSalaryHistory" })
-            });
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getAllSalaryHistory" }) });
             const r = await res.json();
-            
-            if (r.status === "success" && r.data && r.data.length > 0) {
+            if (r.status === "success" && r.data) {
+                // 先按姓名、再按日期由舊到新排序，才能算調幅
                 const sorted = r.data.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant') || new Date(a.date) - new Date(b.date));
                 
-                // 💡 建立包含分頁邏輯的 HTML
                 let htmlOutput = "";
                 let currentName = "";
+                let lastAmount = 0;
 
-                sorted.forEach((h, index) => {
-                    // 如果換人，插入一個新的「一人分頁包」
+                sorted.forEach((h) => {
+                    // 如果換人，重置調幅與插入分頁
                     if (currentName !== "" && currentName !== h.name) {
-                        htmlOutput += `
-                            <tr class="page-break"><td colspan="7" style="border:none;"></td></tr>
-                        `;
+                        htmlOutput += `<tr class="page-break"><td colspan="7"></td></tr>`;
+                        lastAmount = 0; // 換人時調幅重置
                     }
-                    
+
+                    // 💡 計算調幅 %
+                    let diffText = "-";
+                    if (lastAmount > 0) {
+                        const d = ((h.amount - lastAmount) / lastAmount * 100);
+                        diffText = (d >= 0 ? "+" : "") + d.toFixed(1) + "%";
+                    }
+
                     htmlOutput += `
                         <tr>
-                            <td class="name-td" style="display:table-cell !important; text-align:center;">${h.name}</td>
-                            <td style="text-align:right;">$${Number(h.amount).toLocaleString()}</td>
-                            <td style="text-align:center;">-</td>
-                            <td style="text-align:center;">${h.date}</td>
-                            <td style="text-align:center;">${h.rank}</td>
-                            <td style="text-align:center;">${h.type || '-'}</td>
+                            <td class="name-td" style="display:table-cell !important;">${h.name}</td>
+                            <td style="text-align:right; font-weight:bold;">$${Number(h.amount).toLocaleString()}</td>
+                            <td style="font-weight:bold;">${diffText}</td>
+                            <td>${h.date}</td>
+                            <td>${h.rank}</td>
+                            <td>${h.type || '-'}</td>
                             <td style="text-align:left;">${h.note || '-'}</td>
                         </tr>`;
+                    
                     currentName = h.name;
+                    lastAmount = h.amount;
                 });
                 body.innerHTML = htmlOutput;
                 thName.style.display = 'table-cell';
             }
-        } catch (e) {
-            alert("抓取失敗");
-            return;
-        }
+        } catch (e) { alert("資料抓取失敗"); return; }
     } else {
-        await loadSalaryHistoryLocal();
-        thName.style.display = 'none';
+        await loadSalaryHistoryLocal(); // 個人模式維持原計算邏輯
     }
 
-    // 💡 延遲時間增加，確保 CSS 徹底套用移除空白
+    // 💡 增加渲染延遲，確保分頁與邊框計算準確
     setTimeout(() => {
         document.body.classList.add('print-salary');
         window.print();
-        setTimeout(() => {
-            document.body.classList.remove('print-salary');
-            if (mode === 'all') loadSalaryHistoryLocal();
-        }, 1000);
-    }, 1500); // 增加至 1.5 秒
+        setTimeout(() => document.body.classList.remove('print-salary'), 1000);
+    }, 1200);
 }
 
  // 💡 補齊缺失的切換分頁功能
